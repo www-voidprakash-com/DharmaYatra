@@ -1,0 +1,40 @@
+
+/* CSS animation for dice */
+.dice {
+  font-size: 7rem; /* Increased from 3rem for better visibility */
+  padding: 0.5rem; 
+  cursor: pointer;
+  transition: transform 0.2s ease-in-out, color 0.3s ease;
+  display: inline-block; 
+  user-select: none; 
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));
+}
+
+.dice:hover:not([aria-disabled="true"]) {
+  transform: scale(1.1);
+  color: #ea580c; /* darker orange on hover */
+}
+
+/* Tumble animation for human roll */
+.dice.rolling {
+  animation: shake 0.5s linear infinite;
+}
+
+/* Pop animation for when Bot updates the value instantly */
+.dice.pop {
+  animation: pop-scale 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes shake {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(10deg); }
+  50% { transform: rotate(-10deg); }
+  75% { transform: rotate(10deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes pop-scale {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.4); }
+  100% { transform: scale(1); }
+}

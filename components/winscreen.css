@@ -1,0 +1,106 @@
+
+.win-screen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6); /* Darker overlay */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  backdrop-filter: blur(4px); /* Optional: blur background */
+}
+
+.win-screen-content {
+  background-color: #fff;
+  padding: 1.5rem 2rem; /* Adjusted padding */
+  border-radius: 0.75rem; /* Tailwind rounded-xl */
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); /* Tailwind shadow-2xl */
+  text-align: center;
+  width: 100%;
+  max-width: 550px; /* Slightly wider */
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 1px solid rgba(251, 146, 60, 0.5); /* Subtle orange border */
+}
+
+/* For Tailwind Scrollbar styling if plugin is active for this component */
+.win-screen-content.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #fb923c #fed7aa; /* orange-400 thumb, orange-200 track */
+}
+
+.win-screen-content.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+}
+
+.win-screen-content.scrollbar-thin::-webkit-scrollbar-track {
+  background: #fed7aa; /* orange-200 */
+  border-radius: 10px;
+}
+
+.win-screen-content.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: #fb923c; /* orange-400 */
+  border-radius: 10px;
+  border: 2px solid #fed7aa; /* orange-200 track to give padding effect */
+}
+
+/* Simple Confetti Effect */
+.confetti-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.confetti {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background-color: #f2d74e;
+  opacity: 0;
+}
+
+.confetti:nth-child(1) { left: 10%; animation: confetti-fall 3s linear infinite; background: #ef4444; }
+.confetti:nth-child(2) { left: 20%; animation: confetti-fall 5s linear infinite; background: #3b82f6; animation-delay: 1s; }
+.confetti:nth-child(3) { left: 30%; animation: confetti-fall 3.5s linear infinite; background: #22c55e; }
+.confetti:nth-child(4) { left: 40%; animation: confetti-fall 6s linear infinite; background: #eab308; animation-delay: 2s; }
+.confetti:nth-child(5) { left: 50%; animation: confetti-fall 4s linear infinite; background: #a855f7; }
+.confetti:nth-child(6) { left: 60%; animation: confetti-fall 5.5s linear infinite; background: #ec4899; animation-delay: 0.5s; }
+.confetti:nth-child(7) { left: 70%; animation: confetti-fall 3.8s linear infinite; background: #f97316; }
+.confetti:nth-child(8) { left: 80%; animation: confetti-fall 4.5s linear infinite; background: #06b6d4; animation-delay: 1.5s; }
+.confetti:nth-child(9) { left: 90%; animation: confetti-fall 4s linear infinite; background: #84cc16; }
+.confetti:nth-child(10) { left: 95%; animation: confetti-fall 5s linear infinite; background: #ef4444; animation-delay: 2.5s; }
+
+@keyframes confetti-fall {
+  0% { transform: translateY(-10%) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110%) rotate(720deg); opacity: 0; }
+}
+
+@keyframes glow {
+  0% { box-shadow: 0 0 5px #fbbf24; }
+  50% { box-shadow: 0 0 20px #fbbf24, 0 0 40px #f59e0b; }
+  100% { box-shadow: 0 0 5px #fbbf24; }
+}
+
+.animate-glow {
+  animation: glow 3s infinite;
+}
+
+@keyframes pulse-scale {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); box-shadow: 0 0 15px rgba(251, 191, 36, 0.6); }
+}
+
+.winner-card-anim {
+  animation: pulse-scale 2s infinite ease-in-out;
+  border-width: 2px;
+  border-color: #f59e0b; /* Amber 500 */
+}

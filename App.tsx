@@ -1,0 +1,1226 @@
+
+import React, { useState, useCallback, useMemo, createContext, useContext, useEffect, useRef } from 'react';
+import { Language, SquareData, SquareType, Player, GameStage, LanguageOption, MessageHistoryEntry, TurnHistoryEntry } from './types';
+import { BOARD_SIZE, PLAYER_INITIAL_POSITION, PLAYER_BOARD_START_POSITION, SNAKES_LADDERS_MAP, TRANSLATIONS, AVAILABLE_LANGUAGES, AVAILABLE_COLORS, AVAILABLE_ANIMAL_ICONS, AVAILABLE_VOICES } from './constants';
+import Board from './components/Board';
+import GameControls from './components/GameControls';
+import GameSettingsPanel from './components/GameSettingsPanel';
+import GameMessage from './components/GameMessage';
+import PlayerSetup from './components/PlayerSetup';
+import WinScreen from './components/WinScreen';
+import HistoryLog from './components/HistoryLog';
+import NicknameInput from './components/NicknameInput';
+import GameStateSync from './components/GameStateSync';
+import Leaderboard from './components/Leaderboard';
+import FlashMessage from './components/FlashMessage';
+import SageCommentary from './components/SageCommentary';
+import { Howl, Howler } from 'howler';
+import { db, functions } from './firebase';
+import { ref, set, get, update } from 'firebase/database';
+import { httpsCallable } from 'firebase/functions';
+import { FaRedo } from 'react-icons/fa';
+import './components/GameBoard.css';
+
+// Sound Effects
+const diceSound = new Howl({ src: ['/sounds/dice.mp3'], volume: 0.6 });
+const winSound = new Howl({ src: ['/sounds/win.mp3'], volume: 0.5 });
+const snakeSound = new Howl({ src: ['/sounds/snake.mp3'], volume: 0.5 });
+const ladderSound = new Howl({ src: ['/sounds/ladder.mp3'], volume: 0.5 });
+
+
+interface LanguageContextType {
+  language: Language;
+  setLanguage: (language: Language) => void;
+  translate: (key: string, replacements?: Record<string, string | number | undefined>) => string;
+  availableLanguages: LanguageOption[];
+}
+
+const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+
+export const useLanguage = (): LanguageContextType => {
+  const context = useContext(LanguageContext);
+  if (!context) {
+    throw new Error('useLanguage must be used within a LanguageProvider');
+  }
+  return context;
+};
+
+const TURN_ADVANCE_DELAY = 3500; // Increased to allow listening to AI commentary
+const HOP_DURATION = 200; // ms for each square hop
+const SL_ANIMATION_DURATION = 400; // ms for snake/ladder slide visual
+const MAX_HISTORY_ITEMS = 50; // Optimization: Limit log size
+
+interface FirebasePlayerUpdateData {
+  position: number;
+  updatedAt: number;
+}
+
+interface AllFirebasePlayersData {
+  [playerId: string]: FirebasePlayerUpdateData;
+}
+
+interface AnimationState {
+  playerId: number;
+  path: number[]; // Squares to hop to during dice roll
+  currentIndex: number; // Index in path
+  sLTarget?: number; // If a snake/ladder is hit at the end of path
+  finalLandingPos: number; // Ultimate landing square after all effects
+  isProcessingPostSL: boolean; // Flag: true if dice hops done, now processing S/L jump
+  diceRolled: number;
+  originalStartPos: number; // Player's position at the start of the turn
+  isStartingMove: boolean; // Was this the move to get on the board?
+}
+
+// --- Audio Helper Functions for Gemini PCM ---
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function pcmToAudioBuffer(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number = 24000
+): AudioBuffer {
+  const dataInt16 = new Int16Array(data.buffer);
+  const numChannels = 1; // Gemini TTS usually returns mono
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      // Convert Int16 to Float32 [-1.0, 1.0]
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
+
+// Helper to get persona based on voice
+const getVoicePersona = (voiceName: string) => {
+  switch (voiceName) {
+    case 'Fenrir': return { role: 'mystical Himalayan Sage', style: 'wise, deep, ancient Indian phrasing using metaphors of karma and dharma', context: 'karmic journey' };
+    case 'Charon': return { role: 'distinguished Royal Historian', style: 'formal, slightly academic British English, referring to players as travelers in a grand chronicle', context: 'historical journey' };
+    case 'Kore': return { role: 'calm Canyon Guide', style: 'warm, clear American English with nature metaphors (rivers, mountains)', context: 'personal growth journey' };
+    case 'Zephyr': return { role: 'enthusiastic Outback Tracker', style: 'adventurous, upbeat Australian style, calling players "mate" and using adventure terms', context: 'wild adventure' };
+    case 'Puck': return { role: 'whimsical Celtic Bard', style: 'poetic, lyrical, slightly mischievous Irish style, speaking in riddles or rhymes', context: 'mythical tale' };
+    default: return { role: 'mystical Sage', style: 'wise and deep', context: 'journey' };
+  }
+};
+
+// AdMob Hook (Placeholder for Capacitor integration)
+const showInterstitialAd = async () => {
+  // TODO: In Capacitor build: await AdMob.showInterstitial();
+  console.log("AdMob: Interstitial Ad Triggered (Simulation)");
+};
+
+const App = (): React.ReactElement => {
+  const [language, setLanguageState] = useState<Language>(Language.English);
+  const [userNickname, setUserNickname] = useState<string | null>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [currentPlayerIndex, setCurrentPlayerIndex] = useState<number>(0);
+  const [diceValue, setDiceValue] = useState<number | null>(null); // For display only
+  const [gameMessageKey, setGameMessageKey] = useState<string>('msg_welcome');
+  const [messageReplacements, setMessageReplacements] = useState<Record<string, string | number | undefined> | undefined>(undefined);
+  const [gameStage, setGameStage] = useState<GameStage>(GameStage.Setup);
+  const [winners, setWinners] = useState<Player[]>([]);
+  const [messageHistory, setMessageHistory] = useState<MessageHistoryEntry[]>([]);
+  const [turnHistory, setTurnHistory] = useState<TurnHistoryEntry[]>([]);
+  const [animationState, setAnimationState] = useState<AnimationState | null>(null);
+  const [activeSpecialSquare, setActiveSpecialSquare] = useState<{ id: number; type: 'snake' | 'ladder' } | null>(null);
+  const [gameMode, setGameMode] = useState<'multiplayer' | 'practice'>('multiplayer');
+  const [isProcessingTurn, setIsProcessingTurn] = useState<boolean>(false);
+  const [customBackground, setCustomBackground] = useState<string | null>(null);
+
+  // Sage AI State
+  const [sageWisdom, setSageWisdom] = useState<string | null>(null);
+  const [isSageThinking, setIsSageThinking] = useState<boolean>(false);
+  const [isSageSpeaking, setIsSageSpeaking] = useState<boolean>(false);
+  const [aiQuotaExceeded, setAiQuotaExceeded] = useState<boolean>(false);
+  const [sageVoice, setSageVoice] = useState<string>('Fenrir');
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [flashMessageText, setFlashMessageText] = useState<string | null>(null);
+
+  // Audio Context Ref & Source Ref (to stop playback)
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  // Watch history for Flash Messages
+  useEffect(() => {
+    if (messageHistory.length > 0) {
+      const lastMsg = messageHistory[messageHistory.length - 1];
+      // Only flash if it's a new operational message, maybe filter duplicates if needed
+      setFlashMessageText(lastMsg.text);
+    }
+  }, [messageHistory]);
+  // Cache & Refs
+  const lastAudioBase64Ref = useRef<string | null>(null);
+  const summaryGeneratedRef = useRef<boolean>(false); // Prevent duplicate generation
+  const isFinalizingMoveRef = useRef<boolean>(false); // Prevent double-execution of turn logic
+
+  // Refs for auto-play logic
+  const handleRollDiceRef = useRef<(val: number) => void>(() => { });
+
+  useEffect(() => {
+    const savedNickname = localStorage.getItem('dharmayatra_nickname');
+    if (savedNickname) {
+      setUserNickname(savedNickname);
+    }
+  }, []);
+
+  useEffect(() => {
+    const currentLangConfig = AVAILABLE_LANGUAGES.find(l => l.code === language);
+
+    AVAILABLE_LANGUAGES.forEach(langOption => {
+      if (langOption.fontClass && document.body.classList.contains(langOption.fontClass)) {
+        document.body.classList.remove(langOption.fontClass);
+      }
+    });
+    if (document.body.classList.contains('font-noto-sans')) {
+      document.body.classList.remove('font-noto-sans');
+    }
+
+    if (currentLangConfig && currentLangConfig.fontClass) {
+      document.body.classList.add(currentLangConfig.fontClass);
+    } else {
+      document.body.classList.add('font-noto-sans');
+    }
+  }, [language]);
+
+
+  const setLanguage = useCallback((lang: Language) => {
+    setLanguageState(lang);
+  }, []);
+
+
+  const translate = useCallback((key: string, replacements?: Record<string, string | number | undefined>): string => {
+    let translation = TRANSLATIONS[language][key] || TRANSLATIONS[Language.English][key] || key;
+    if (replacements) {
+      Object.keys(replacements).forEach(placeholder => {
+        const replacementValue = replacements[placeholder];
+        translation = translation.replace(new RegExp(`{${placeholder}}`, 'g'), replacementValue !== undefined ? String(replacementValue) : '');
+      });
+    }
+    return translation;
+  }, [language]);
+
+  const addMessageToHistory = useCallback((text: string) => {
+    setMessageHistory(prev => {
+      // Optimization: Deduplicate if same message added within 500ms (debounce)
+      if (prev.length > 0) {
+        const lastMsg = prev[prev.length - 1];
+        if (lastMsg.text === text && (Date.now() - lastMsg.timestamp < 1000)) {
+          return prev;
+        }
+      }
+      const newItem = { id: Date.now().toString() + Math.random(), text, timestamp: Date.now() };
+      // Limit history size
+      const newHistory = [...prev, newItem];
+      if (newHistory.length > MAX_HISTORY_ITEMS) return newHistory.slice(-MAX_HISTORY_ITEMS);
+      return newHistory;
+    });
+  }, []);
+
+  const addTurnToHistory = useCallback((turnData: Omit<TurnHistoryEntry, 'id' | 'timestamp'>) => {
+    setTurnHistory(prev => {
+      const newItem = { ...turnData, id: Date.now().toString() + Math.random(), timestamp: Date.now() };
+      const newHistory = [...prev, newItem];
+      if (newHistory.length > MAX_HISTORY_ITEMS) return newHistory.slice(-MAX_HISTORY_ITEMS);
+      return newHistory;
+    });
+  }, []);
+
+  const handleBackgroundUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCustomBackground(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  }, []);
+
+  const handleBackgroundClear = useCallback(() => {
+    setCustomBackground(null);
+  }, []);
+
+  // Initialize AudioContext on user interaction
+  const initAudioContext = () => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
+    }
+  };
+
+  // Immediate stop function
+  const stopSageAudio = useCallback(() => {
+    if (audioSourceRef.current) {
+      try {
+        audioSourceRef.current.stop();
+      } catch (e) {
+        // ignore if already stopped
+      }
+      audioSourceRef.current = null;
+    }
+    setIsSageSpeaking(false);
+  }, []);
+
+  // Stop audio whenever the voice changes to prevent persona mismatch
+  useEffect(() => {
+    stopSageAudio();
+  }, [sageVoice, stopSageAudio]);
+
+  // Core audio player function using cached base64
+  const playAudioFromBase64 = useCallback((base64Audio: string) => {
+    stopSageAudio();
+    if (isMuted) return; // Prevent playback if muted
+
+    initAudioContext();
+
+    if (!audioContextRef.current) return;
+
+    setIsSageSpeaking(true);
+
+    try {
+      const ctx = audioContextRef.current;
+      const rawBytes = base64ToUint8Array(base64Audio);
+      const audioBuffer = pcmToAudioBuffer(rawBytes, ctx, 24000);
+
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+
+      // Just slightly slow down for cosmic deepness
+      source.playbackRate.value = 0.95;
+
+      source.connect(ctx.destination);
+
+      audioSourceRef.current = source;
+      source.start();
+
+      source.onended = () => {
+        // Only reset state if this is still the active source
+        if (audioSourceRef.current === source) {
+          setIsSageSpeaking(false);
+          audioSourceRef.current = null;
+        }
+      };
+    } catch (e) {
+      console.warn("Audio playback failed", e);
+      setIsSageSpeaking(false);
+    }
+  }, [stopSageAudio]);
+
+  const toggleMute = useCallback(() => {
+    setIsMuted(prev => {
+      const newState = !prev;
+      Howler.mute(newState);
+      if (newState) {
+        stopSageAudio();
+      }
+      return newState;
+    });
+  }, [stopSageAudio]);
+
+
+  // Replay function
+  const replaySageAudio = useCallback(() => {
+    if (lastAudioBase64Ref.current) {
+      playAudioFromBase64(lastAudioBase64Ref.current);
+    }
+  }, [playAudioFromBase64]);
+
+
+  const generateAndPlayCosmicSpeech = async (text: string) => {
+    stopSageAudio(); // Ensure any running audio stops
+
+    if (aiQuotaExceeded) return;
+
+    // Set UI to speaking tentatively while we fetch audio
+    setIsSageSpeaking(true);
+    lastAudioBase64Ref.current = null; // Reset cache
+
+    // Use Firebase Function wrapper instead of direct client call
+    try {
+      const generateSpeech = httpsCallable(functions, 'generateSpeech');
+      const response: any = await generateSpeech({ text, voiceName: sageVoice });
+      const base64Audio = response.data.audioContent;
+
+      if (base64Audio) {
+        lastAudioBase64Ref.current = base64Audio;
+        playAudioFromBase64(base64Audio);
+      } else {
+        setIsSageSpeaking(false);
+      }
+
+    } catch (error) {
+      console.warn("TTS Error via Cloud Function:", error);
+      setIsSageSpeaking(false);
+    }
+  };
+
+  const generateAICommentary = useCallback(async (
+    player: Player,
+    squareId: number,
+    eventType: 'snake' | 'ladder' | 'win' | 'start' | 'extra',
+    squareName: string,
+    rawSLKey?: string
+  ) => {
+    // Immediate fallback if key missing or previous quota error
+    if (aiQuotaExceeded) {
+      setSageWisdom(translate(`sage_fallback_${eventType === 'start' ? 'ladder' : eventType === 'extra' ? 'extra' : eventType}`, { playerName: player.name }));
+      return;
+    }
+
+    setIsSageThinking(true);
+    setSageWisdom(null);
+    stopSageAudio();
+    lastAudioBase64Ref.current = null;
+
+    const slDescription = rawSLKey ? translate(rawSLKey, {
+      playerName: player.name,
+      playerColorName: translate(player.color.nameKey),
+      playerAnimalName: translate(player.animalIcon.nameKey)
+    }) : '';
+
+    const persona = getVoicePersona(sageVoice);
+
+    const prompt = `
+      You are a ${persona.role} narrating a game of 'DharmaYatra' (Snakes & Ladders).
+      Event Details: Player "${player.name}", Event ${eventType.toUpperCase()}, Square ${squareId} (${squareName}), Context: ${slDescription}.
+      Language: ${language}.
+      Task: Provide a 1-sentence commentary. Deep, engaging, paced. Max 20 words.
+    `;
+
+    try {
+      // Use Firebase Cloud Function for security
+      const generateCommentary = httpsCallable(functions, 'generateCommentary');
+      const result: any = await generateCommentary({ prompt });
+
+      if (result.data.text) {
+        const finalText = result.data.text;
+        setSageWisdom(finalText);
+        generateAndPlayCosmicSpeech(finalText);
+      } else {
+        throw new Error("Empty AI response");
+      }
+    } catch (error: any) {
+      console.warn("Cloud Function AI failed.", error);
+      // Fallback to offline text
+      setSageWisdom(translate(`sage_fallback_${eventType === 'start' ? 'ladder' : eventType === 'extra' ? 'extra' : eventType}`, { playerName: player.name }));
+    } finally {
+      setIsSageThinking(false);
+    }
+  }, [language, translate, aiQuotaExceeded, sageVoice]);
+
+
+  const generateGameSummary = useCallback(async (winner: Player, allPlayers: Player[], gameTurnHistory: TurnHistoryEntry[]) => {
+    if (summaryGeneratedRef.current) return;
+    if (aiQuotaExceeded) return;
+
+    summaryGeneratedRef.current = true;
+    setIsSageThinking(true);
+    setSageWisdom(null);
+    stopSageAudio();
+
+    const losers = allPlayers.filter(p => p.id !== winner.id);
+    const winnerMoves = gameTurnHistory.filter(t => t.playerId === winner.id);
+    const winnerLadders = winnerMoves.filter(t => t.actionKey === 'turn_action_ladder').length;
+    const winnerSnakes = winnerMoves.filter(t => t.actionKey === 'turn_action_snake').length;
+
+    const loserStories = losers.map(loser => {
+      const moves = gameTurnHistory.filter(t => t.playerId === loser.id);
+      const snakeHits = moves.filter(t => t.actionKey === 'turn_action_snake').map(t => t.slType).filter(Boolean);
+      return {
+        name: loser.name,
+        vices: [...new Set(snakeHits)].slice(0, 2),
+        snakeCount: snakeHits.length
+      };
+    });
+
+    const persona = getVoicePersona(sageVoice);
+
+    const prompt = `
+        You are a ${persona.role} summarizing a finished game of DharmaYatra.
+        Winner: "${winner.name}" (Climbed ${winnerLadders} Ladders, Fell to ${winnerSnakes} Snakes).
+        Others: ${JSON.stringify(loserStories)}.
+        Language: ${language}.
+        Task: Create a beautiful, cohesive story summarizing the karmic journey. Max 3-4 sentences.
+      `;
+
+    try {
+      const generateSummary = httpsCallable(functions, 'generateCommentary'); // Reusing commentary function or dedicated one
+      const result: any = await generateSummary({ prompt });
+
+      if (result.data.text) {
+        const finalText = result.data.text;
+        setSageWisdom(finalText);
+        generateAndPlayCosmicSpeech(finalText);
+      }
+    } catch (error) {
+      setSageWisdom(translate('sage_fallback_win', { playerName: winner.name }));
+    } finally {
+      setIsSageThinking(false);
+    }
+
+  }, [language, aiQuotaExceeded, stopSageAudio, sageVoice]);
+
+
+  useEffect(() => {
+    if (gameStage === GameStage.Setup && userNickname) {
+      addMessageToHistory(translate('msg_welcome'));
+    }
+    // Reset the summary flag when setup starts
+    if (gameStage === GameStage.Setup) {
+      summaryGeneratedRef.current = false;
+    }
+  }, [gameStage, userNickname, translate, addMessageToHistory]);
+
+  const boardSquares = useMemo((): SquareData[] => {
+    return Array.from({ length: BOARD_SIZE }, (_, i) => {
+      const id = i + 1;
+      let type = SquareType.Normal;
+      let specialTextKey: string | undefined;
+      if (id === PLAYER_BOARD_START_POSITION) type = SquareType.Janma;
+      if (id === BOARD_SIZE) type = SquareType.Poorna;
+
+      const snakeLadderInfo = SNAKES_LADDERS_MAP[id];
+      if (snakeLadderInfo) {
+        type = snakeLadderInfo.type === 'snake' ? SquareType.SnakeHead : SquareType.LadderBottom;
+      }
+
+      if (id === PLAYER_BOARD_START_POSITION) specialTextKey = 'janma_label';
+      if (id === BOARD_SIZE) specialTextKey = 'poorna_label';
+
+      return { id, type, specialTextKey, snakeLadderInfo };
+    });
+  }, []);
+
+  const updatePlayerPositionInDB = useCallback((playerId: number, position: number) => {
+    if (gameMode === 'practice') return; // Skip DB updates in practice
+    if (!db) return;
+    const playerRef = ref(db, `game/players/${playerId}`);
+    set(playerRef, {
+      position: position,
+      updatedAt: Date.now()
+    }).catch(error => {
+      console.error("Firebase: Failed to update player position:", error);
+    });
+  }, [gameMode]);
+
+  const updateGameResultInDB = useCallback(async (winnerName: string, allPlayers: Player[]) => {
+    if (gameMode === 'practice') return; // Skip DB updates in practice
+
+    // AdMob Trigger
+    showInterstitialAd();
+
+    if (!db) return;
+
+    const updates: any = {};
+    const timestamp = Date.now();
+
+    // Update Winner
+    const sanitizedWinnerName = winnerName.replace(/[.#$[\]]/g, '_');
+    const winnerRef = ref(db, `leaderboard/${sanitizedWinnerName}`);
+    try {
+      const snapshot = await get(winnerRef);
+      let currentWins = 0;
+      let currentStreak = 0;
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        currentWins = data.wins || 0;
+        currentStreak = data.streak || 0;
+      }
+      updates[`leaderboard/${sanitizedWinnerName}`] = {
+        wins: currentWins + 1,
+        streak: currentStreak + 1,
+        lastWinAt: timestamp
+      };
+    } catch (err) {
+      console.error(`Firebase: Failed to fetch winner stats for ${winnerName}:`, err);
+    }
+
+    // Reset Streaks for Losers
+    for (const player of allPlayers) {
+      if (player.name !== winnerName) {
+        const sanitizedLoserName = player.name.replace(/[.#$[\]]/g, '_');
+        const loserRef = ref(db, `leaderboard/${sanitizedLoserName}`);
+        try {
+          const snapshot = await get(loserRef);
+          if (snapshot.exists()) {
+            const data = snapshot.val();
+            updates[`leaderboard/${sanitizedLoserName}`] = {
+              ...data,
+              streak: 0
+            };
+          }
+        } catch (err) { }
+      }
+    }
+
+    try {
+      await update(ref(db), updates);
+    } catch (err) {
+      console.error("Firebase: Failed to perform bulk update for game results:", err);
+    }
+
+  }, [gameMode]);
+
+  const handleRemoteGameStateUpdate = useCallback((remotePlayersData: AllFirebasePlayersData) => {
+    if (gameMode === 'practice') return; // Do not listen to remote in practice
+    setPlayers(prevPlayers => {
+      let hasChanged = false;
+      const updatedPlayers = prevPlayers.map(localPlayer => {
+        if (animationState && localPlayer.id === animationState.playerId) return localPlayer;
+
+        const remotePlayerData = remotePlayersData[localPlayer.id.toString()];
+        if (remotePlayerData && localPlayer.position !== remotePlayerData.position) {
+          hasChanged = true;
+          return { ...localPlayer, position: remotePlayerData.position };
+        }
+        return localPlayer;
+      });
+      return hasChanged ? updatedPlayers : prevPlayers;
+    });
+  }, [animationState, setPlayers, gameMode]);
+
+
+  const resetGame = useCallback(() => {
+    setAnimationState(null);
+    setActiveSpecialSquare(null);
+    setPlayers([]);
+    setCurrentPlayerIndex(0);
+    setDiceValue(null);
+    setGameMessageKey(userNickname ? 'msg_welcome' : '');
+    setMessageReplacements(undefined);
+    setGameStage(GameStage.Setup);
+    setWinners([]);
+    setMessageHistory([]);
+    setTurnHistory([]);
+    setSageWisdom(null);
+    setIsProcessingTurn(false);
+    stopSageAudio(); // Stop audio on reset
+    lastAudioBase64Ref.current = null; // Clear cache
+    summaryGeneratedRef.current = false; // Allow summary for next game
+    setAiQuotaExceeded(false); // Reset AI quota state on new game
+    if (userNickname) {
+      addMessageToHistory(translate('msg_welcome'));
+    }
+  }, [userNickname, translate, addMessageToHistory, setAnimationState, setPlayers, setCurrentPlayerIndex, setDiceValue, setGameMessageKey, setMessageReplacements, setGameStage, setWinners, setMessageHistory, setTurnHistory, stopSageAudio]);
+
+
+  const startGame = useCallback(async (configuredPlayersSetup: Player[]) => {
+    initAudioContext(); // Initialize audio context on game start button click
+
+    // Check mode based on players
+    const isPractice = configuredPlayersSetup.some(p => p.isComputer);
+    setGameMode(isPractice ? 'practice' : 'multiplayer');
+
+    let initialPlayers = configuredPlayersSetup;
+
+    if (!isPractice) {
+      // Fetch streak data from Firebase for all players only if multiplayer
+      const playersWithStreaks = await Promise.all(configuredPlayersSetup.map(async (p) => {
+        if (!db) return { ...p, consecutiveWins: 0 };
+        const sanitizedName = p.name.replace(/[.#$[\]]/g, '_');
+        try {
+          const snapshot = await get(ref(db, `leaderboard/${sanitizedName}`));
+          const val = snapshot.val();
+          return { ...p, consecutiveWins: val?.streak || 0 };
+        } catch (e) {
+          return { ...p, consecutiveWins: 0 };
+        }
+      }));
+      initialPlayers = playersWithStreaks;
+    }
+
+    initialPlayers = initialPlayers.map(p => {
+      // Handle custom starting position logic
+      const startPos = p.startingSquare || PLAYER_INITIAL_POSITION;
+      const isStarted = (p.startingSquare || 0) > 0;
+
+      return {
+        ...p,
+        position: startPos,
+        hasStarted: isStarted,
+        diceThrows: 0,
+        hasFinished: false,
+        finishRank: null,
+      };
+    });
+    setPlayers(initialPlayers);
+    setIsProcessingTurn(false);
+
+    // Initial sync write - bypassing callback dependency state lag issue by inline logic
+    if (!isPractice && db) {
+      initialPlayers.forEach(player => {
+        const playerRef = ref(db, `game/players/${player.id}`);
+        set(playerRef, {
+          position: player.position,
+          updatedAt: Date.now()
+        }).catch(e => console.error("Initial DB sync failed", e));
+      });
+    }
+
+    setCurrentPlayerIndex(0);
+    setDiceValue(null);
+    setGameStage(GameStage.Playing);
+    const firstPlayer = initialPlayers[0];
+    const startMsgKey = 'msg_game_started';
+    const startMsgReplacements = { firstPlayerName: firstPlayer.name };
+    setGameMessageKey(startMsgKey);
+    setMessageReplacements(startMsgReplacements);
+    addMessageToHistory(translate(startMsgKey, startMsgReplacements));
+
+    // If first player is already started (e.g. veteran), log it
+    initialPlayers.forEach(p => {
+      if (p.hasStarted && p.position > 0) {
+        addTurnToHistory({
+          playerId: p.id,
+          playerName: p.name,
+          diceValue: 0,
+          startPosition: 0,
+          endPosition: p.position,
+          actionKey: 'turn_action_started_veteran',
+          actionDetails: `Start at ${p.position}`
+        });
+      }
+    });
+
+  }, [translate, addMessageToHistory, setPlayers, setCurrentPlayerIndex, setDiceValue, setGameStage, setGameMessageKey, setMessageReplacements, addTurnToHistory]);
+
+  const advanceToNextPlayer = useCallback(() => {
+    setSageWisdom(null); // Clear wisdom on next turn
+    stopSageAudio(); // Stop audio on turn change
+    lastAudioBase64Ref.current = null; // Clear cache for new turn
+    setCurrentPlayerIndex(prevIndex => {
+      let nextIndex = (prevIndex + 1) % players.length;
+      const startIndexLoopCheck = nextIndex;
+      while (players[nextIndex]?.hasFinished) {
+        nextIndex = (nextIndex + 1) % players.length;
+        if (nextIndex === startIndexLoopCheck) {
+          return prevIndex;
+        }
+      }
+      return nextIndex;
+    });
+    // Critical: release the turn lock so the new player (human or bot) can act
+    setIsProcessingTurn(false);
+  }, [players, setCurrentPlayerIndex, stopSageAudio]);
+
+  useEffect(() => {
+    if (gameStage === GameStage.Playing && players.length > 0 && players[currentPlayerIndex] && !animationState) {
+      const currentActivePlayer = players[currentPlayerIndex];
+
+      // Computer Turn Logic
+      // Added !isProcessingTurn check to prevent infinite loop of turn stealing
+      if (currentActivePlayer.isComputer && !currentActivePlayer.hasFinished && !isProcessingTurn) {
+        const timer = setTimeout(() => {
+          const roll = Math.floor(Math.random() * 6) + 1;
+          handleRollDiceRef.current(roll);
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+
+      if (!currentActivePlayer || currentActivePlayer.hasFinished) {
+        // ... handled elsewhere
+      } else {
+        const turnMsgKey = currentActivePlayer.hasStarted ? 'current_player_turn' : 'msg_player_turn_prompt_start';
+        const turnMsgReplacements = { playerName: currentActivePlayer.name };
+        setGameMessageKey(turnMsgKey);
+        setMessageReplacements(turnMsgReplacements);
+      }
+    }
+  }, [currentPlayerIndex, players, gameStage, animationState, setGameMessageKey, setMessageReplacements, isProcessingTurn]);
+
+
+  // Effect to handle Game Over state transition securely
+  useEffect(() => {
+    if (gameStage !== GameStage.Playing || players.length === 0) return;
+
+    const activePlayers = players.filter(p => !p.hasFinished);
+
+    // Check if game should end: either single player finished, or all multiplayer finished
+    if (activePlayers.length === 0) {
+      setGameStage(GameStage.GameOver);
+
+      // Trigger Summary
+      const winner = players.find(p => p.finishRank === 1) || players[0];
+      generateGameSummary(winner, players, turnHistory);
+    }
+  }, [players, gameStage, generateGameSummary, turnHistory]);
+
+
+  const finalizeAndLogMove = useCallback((
+    pId: number,
+    finalPos: number,
+    rolledDice: number,
+    turnActualStartPos: number,
+    landedOnDiceSquare: number,
+    wasSL: boolean,
+    wasStartingMove: boolean
+  ) => {
+
+    const playerIndex = players.findIndex(p => p.id === pId);
+    if (playerIndex === -1) return;
+
+    const updatedPlayersArray = [...players];
+    const playerToUpdate = { ...updatedPlayersArray[playerIndex] };
+
+    playerToUpdate.position = finalPos;
+    playerToUpdate.diceThrows += 1;
+
+    if (wasStartingMove && finalPos === PLAYER_BOARD_START_POSITION) {
+      playerToUpdate.hasStarted = true;
+    }
+
+    updatePlayerPositionInDB(pId, finalPos);
+
+    let localMessageKey = '';
+    let localMessageReplacements: Record<string, string | number | undefined> = {
+      playerName: playerToUpdate.name,
+      diceValue: rolledDice,
+      position: landedOnDiceSquare
+    };
+    let turnActionKey = '';
+    let turnActionDetails: string | undefined = undefined;
+
+    const slInfo = SNAKES_LADDERS_MAP[landedOnDiceSquare];
+
+    // Trigger AI Commentary
+    if (wasSL && slInfo) {
+      generateAICommentary(
+        playerToUpdate,
+        landedOnDiceSquare,
+        slInfo.type,
+        translate(slInfo.key),
+        slInfo.key
+      );
+    }
+
+    if (wasStartingMove) {
+      // Veteran logic disabled for practice or if not applicable
+      const wasVeteranStart = (gameMode === 'multiplayer' && rolledDice !== 1 && rolledDice !== 6 && playerToUpdate.consecutiveWins >= 3);
+
+      localMessageKey = wasVeteranStart ? 'msg_player_started_veteran' : 'msg_player_started';
+      localMessageReplacements.diceValue = rolledDice;
+      turnActionKey = wasVeteranStart ? 'turn_action_started_veteran' : 'turn_action_started_journey';
+      turnActionDetails = `${finalPos}`;
+      generateAICommentary(playerToUpdate, 1, 'start', 'Janma');
+    } else if (wasSL && slInfo) {
+      const translatedColorName = translate(playerToUpdate.color.nameKey);
+      const translatedAnimalName = translate(playerToUpdate.animalIcon.nameKey);
+      const dynamicDescription = translate(slInfo.key, {
+        playerName: playerToUpdate.name,
+        playerColorName: translatedColorName,
+        playerAnimalName: translatedAnimalName,
+      });
+
+      localMessageKey = slInfo.type === 'snake' ? 'msg_landed_on_snake' : 'msg_climbed_ladder';
+      localMessageReplacements.text = dynamicDescription;
+      localMessageReplacements.newPosition = finalPos;
+      turnActionKey = slInfo.type === 'snake' ? 'turn_action_snake' : 'turn_action_ladder';
+      turnActionDetails = `${landedOnDiceSquare} -> ${finalPos}`;
+      if (slInfo.type === 'snake') snakeSound.play(); else ladderSound.play();
+    } else {
+      localMessageKey = 'msg_landed_on';
+      localMessageReplacements.position = finalPos;
+      turnActionKey = 'turn_action_moved';
+    }
+
+    let hasPlayerFinished = false;
+
+    if (finalPos === BOARD_SIZE) {
+      if (!playerToUpdate.hasFinished) {
+        winSound.play();
+        updateGameResultInDB(playerToUpdate.name, updatedPlayersArray);
+        if (updatedPlayersArray.filter(p => !p.hasFinished).length > 1) {
+          generateAICommentary(playerToUpdate, 100, 'win', 'Poorna');
+        }
+      }
+      playerToUpdate.hasFinished = true;
+      hasPlayerFinished = true;
+
+      localMessageKey = 'msg_player_wins';
+      localMessageReplacements.diceThrows = playerToUpdate.diceThrows;
+      turnActionKey = wasSL ? 'turn_action_won_via_sl' : 'turn_action_won';
+      if (wasSL && slInfo) {
+        localMessageReplacements.slType = translate(slInfo.type === 'snake' ? 'text_snake_description_prefix' : 'text_ladder_description_prefix');
+      }
+    }
+
+    const hasExtraTurn = (rolledDice === 6 && !playerToUpdate.hasFinished && finalPos !== BOARD_SIZE);
+
+    if (hasExtraTurn) {
+      localMessageKey = 'msg_extra_turn';
+    }
+
+    // UPDATE STATE ONCE
+    setGameMessageKey(localMessageKey);
+    setMessageReplacements(localMessageReplacements);
+    addMessageToHistory(translate(localMessageKey, localMessageReplacements));
+
+    const newTurnEntry = {
+      playerId: pId,
+      playerName: playerToUpdate.name,
+      diceValue: rolledDice,
+      startPosition: turnActualStartPos,
+      endPosition: finalPos,
+      actionKey: turnActionKey,
+      actionDetails: turnActionDetails,
+      slType: wasSL && slInfo ? translate(slInfo.type === 'snake' ? 'Snake!' : 'Ladder!') : undefined
+    };
+    addTurnToHistory(newTurnEntry);
+
+    updatedPlayersArray[playerIndex] = playerToUpdate;
+
+    // Calculate winners list for state update
+    let newWinners = [...winners];
+    if (hasPlayerFinished) {
+      const existingWinner = newWinners.find(w => w.id === playerToUpdate.id);
+      if (!existingWinner) {
+        playerToUpdate.finishRank = newWinners.length + 1;
+        newWinners = [...newWinners, playerToUpdate].sort((a, b) => (a.finishRank || Infinity) - (b.finishRank || Infinity));
+        setWinners(newWinners);
+      }
+    }
+
+    setPlayers(updatedPlayersArray);
+
+    // SIDE EFFECTS (Turn Advance)
+    const activePlayersLeft = updatedPlayersArray.filter(p => !p.hasFinished);
+
+    if (activePlayersLeft.length === 0 && updatedPlayersArray.length > 0) {
+      // Game Over handled by effect
+    } else if (!playerToUpdate.hasFinished) {
+      if (hasExtraTurn) {
+        generateAICommentary(playerToUpdate, finalPos, 'extra', 'Extra Turn');
+        // If it's an extra turn, unlock processing so computer (or player) can roll again immediately
+        setIsProcessingTurn(false);
+      } else {
+        setTimeout(() => advanceToNextPlayer(), TURN_ADVANCE_DELAY);
+      }
+    } else if (activePlayersLeft.length > 0 && playerToUpdate.hasFinished) {
+      setTimeout(() => advanceToNextPlayer(), TURN_ADVANCE_DELAY);
+    }
+
+  }, [players, winners, translate, addMessageToHistory, addTurnToHistory, updatePlayerPositionInDB, updateGameResultInDB, advanceToNextPlayer, setWinners, setGameMessageKey, setMessageReplacements, generateAICommentary, snakeSound, ladderSound, winSound, gameMode]);
+
+  // Ref to hold the latest version of finalizeAndLogMove
+  const finalizeMoveRef = useRef(finalizeAndLogMove);
+  useEffect(() => {
+    finalizeMoveRef.current = finalizeAndLogMove;
+  }, [finalizeAndLogMove]);
+
+
+  useEffect(() => {
+    if (!animationState) return;
+
+    const { playerId, path, currentIndex, sLTarget, finalLandingPos, isProcessingPostSL, diceRolled, originalStartPos, isStartingMove } = animationState;
+
+    let timer: ReturnType<typeof setTimeout>;
+
+    if (isProcessingPostSL) {
+      // Temporary visual update only for S/L slide
+      setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, position: finalLandingPos } : p));
+
+      timer = setTimeout(() => {
+        if (!isFinalizingMoveRef.current) {
+          isFinalizingMoveRef.current = true;
+          // Use Ref to call the function to avoid dependency cycle
+          finalizeMoveRef.current(playerId, finalLandingPos, diceRolled, originalStartPos, path[path.length - 1], true, isStartingMove);
+          setAnimationState(null);
+          setActiveSpecialSquare(null);
+        }
+      }, SL_ANIMATION_DURATION);
+    } else {
+      if (currentIndex < path.length - 1) {
+        const nextIdx = currentIndex + 1;
+        const nextVisPos = path[nextIdx];
+        timer = setTimeout(() => {
+          setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, position: nextVisPos } : p));
+          setAnimationState(prev => prev ? ({ ...prev, currentIndex: nextIdx }) : null);
+        }, HOP_DURATION);
+      } else {
+        if (sLTarget === undefined) {
+          if (!isFinalizingMoveRef.current) {
+            isFinalizingMoveRef.current = true;
+            finalizeMoveRef.current(playerId, finalLandingPos, diceRolled, originalStartPos, path[path.length - 1], false, isStartingMove);
+            setAnimationState(null);
+          }
+        } else {
+          const hitSquare = path[path.length - 1];
+          const info = SNAKES_LADDERS_MAP[hitSquare];
+          if (info) {
+            setActiveSpecialSquare({ id: hitSquare, type: info.type });
+            setTimeout(() => setActiveSpecialSquare(null), 2000);
+          }
+          setAnimationState(prev => prev ? ({ ...prev, isProcessingPostSL: true }) : null);
+        }
+      }
+    }
+
+    return () => clearTimeout(timer);
+    // Dependency array is now stable because we don't include finalizeAndLogMove directly
+  }, [animationState, setPlayers, setAnimationState]); // Removed finalizeAndLogMove
+
+
+  const handleRollDice = useCallback((rolledValue: number) => {
+    if (gameStage !== GameStage.Playing || players.length === 0 || animationState || isProcessingTurn) return;
+
+    // Only init audio context if it's a real user click, not computer
+    if (!players[currentPlayerIndex]?.isComputer) {
+      initAudioContext();
+    }
+
+    const currentPlayer = players[currentPlayerIndex];
+    if (!currentPlayer || currentPlayer.hasFinished) return;
+
+    setIsProcessingTurn(true); // Lock the turn logic
+    setSageWisdom(null); // Reset wisdom on new roll
+    stopSageAudio(); // Stop old audio on new roll
+    lastAudioBase64Ref.current = null; // Clear cache
+    setDiceValue(rolledValue);
+    diceSound.play();
+
+    // Reset the finalizing lock for this new turn
+    isFinalizingMoveRef.current = false;
+
+    const turnStartPos = currentPlayer.position;
+    let pathForAnimation: number[] = [];
+    let landedOnAfterDice: number;
+    let isStarting = false;
+
+    if (!currentPlayer.hasStarted) {
+      // RULE UPDATE: Check if roll is 1, 6 OR if streak >= 3 (Multiplayer only)
+      const canEnter = rolledValue === 1 || rolledValue === 6 || (gameMode === 'multiplayer' && currentPlayer.consecutiveWins >= 3);
+
+      if (canEnter) {
+        pathForAnimation = [PLAYER_BOARD_START_POSITION];
+        landedOnAfterDice = PLAYER_BOARD_START_POSITION;
+        isStarting = true;
+      } else {
+        const failMsgKey = 'msg_player_roll_to_start_fail';
+        const failMsgReplacements = { playerName: currentPlayer.name, diceValue: rolledValue };
+        setGameMessageKey(failMsgKey);
+        setMessageReplacements(failMsgReplacements);
+        addMessageToHistory(translate(failMsgKey, failMsgReplacements));
+        addTurnToHistory({ playerId: currentPlayer.id, playerName: currentPlayer.name, diceValue: rolledValue, startPosition: turnStartPos, endPosition: turnStartPos, actionKey: 'turn_action_failed_to_start' });
+        setTimeout(() => advanceToNextPlayer(), 1500); // Shorter delay for simple fail
+        return;
+      }
+    } else {
+      for (let i = 1; i <= rolledValue; i++) {
+        pathForAnimation.push(currentPlayer.position + i);
+      }
+      landedOnAfterDice = pathForAnimation[pathForAnimation.length - 1];
+
+      if (landedOnAfterDice > BOARD_SIZE) {
+        const overshootMsgKey = 'msg_exact_roll_needed';
+        const overshootMsgReplacements = { playerName: currentPlayer.name, diceValue: rolledValue, position: currentPlayer.position };
+        setGameMessageKey(overshootMsgKey);
+        setMessageReplacements(overshootMsgReplacements);
+        addMessageToHistory(translate(overshootMsgKey, overshootMsgReplacements));
+        addTurnToHistory({ playerId: currentPlayer.id, playerName: currentPlayer.name, diceValue: rolledValue, startPosition: turnStartPos, endPosition: currentPlayer.position, actionKey: 'turn_action_overshot' });
+        setTimeout(() => advanceToNextPlayer(), 1500); // Shorter delay for simple overshoot
+        return;
+      }
+    }
+
+    const slInfo = SNAKES_LADDERS_MAP[landedOnAfterDice];
+    const sLTargetVal = slInfo ? slInfo.to : undefined;
+    const finalActualLandingPos = sLTargetVal !== undefined ? sLTargetVal : landedOnAfterDice;
+
+    setAnimationState({
+      playerId: currentPlayer.id,
+      path: pathForAnimation,
+      currentIndex: -1,
+      sLTarget: sLTargetVal,
+      finalLandingPos: finalActualLandingPos,
+      isProcessingPostSL: false,
+      diceRolled: rolledValue,
+      originalStartPos: turnStartPos,
+      isStartingMove: isStarting,
+    });
+
+  }, [gameStage, players, currentPlayerIndex, animationState, translate, addMessageToHistory, addTurnToHistory, advanceToNextPlayer, setDiceValue, setGameMessageKey, setMessageReplacements, setAnimationState, stopSageAudio, gameMode, isProcessingTurn]);
+
+  // Keep reference for computer logic
+  useEffect(() => {
+    handleRollDiceRef.current = handleRollDice;
+  }, [handleRollDice]);
+
+
+  useEffect(() => {
+    return () => {
+      setAnimationState(null);
+    };
+  }, [setAnimationState]);
+
+  const handleNicknameSubmit = useCallback((nickname: string) => {
+    setUserNickname(nickname);
+    setGameMessageKey('msg_welcome');
+    setMessageReplacements(undefined);
+    addMessageToHistory(translate('msg_welcome'));
+  }, [translate, addMessageToHistory, setUserNickname, setGameMessageKey, setMessageReplacements]);
+
+  const languageContextValue = useMemo(() => ({
+    language,
+    setLanguage,
+    translate,
+    availableLanguages: AVAILABLE_LANGUAGES,
+  }), [language, setLanguage, translate]);
+
+  const currentPlayerDataForDisplay = (gameStage === GameStage.Playing || gameStage === GameStage.GameOver) && players.length > 0 && players[currentPlayerIndex] ? players[currentPlayerIndex] : null;
+
+  const formattedTurnHistory = turnHistory.map(turn => {
+    let text = translate(turn.actionKey, {
+      playerName: turn.playerName,
+      diceValue: turn.diceValue,
+      startPosition: turn.startPosition,
+      endPosition: turn.endPosition,
+      slType: turn.slType
+    });
+    return { id: turn.id, text };
+  });
+
+  const gameSyncComponent = userNickname && gameMode === 'multiplayer' ? <GameStateSync onUpdate={handleRemoteGameStateUpdate} /> : null;
+
+
+  if (!userNickname) {
+    return (
+      <LanguageContext.Provider value={languageContextValue}>
+        <NicknameInput onSubmit={handleNicknameSubmit} initialNickname={userNickname} />
+      </LanguageContext.Provider>
+    );
+  }
+
+  if (gameStage === GameStage.Setup) {
+    return (
+      <LanguageContext.Provider value={languageContextValue}>
+        {gameSyncComponent}
+        <PlayerSetup onStartGame={startGame} userNickname={userNickname} />
+      </LanguageContext.Provider>
+    );
+  }
+
+  return (
+    <LanguageContext.Provider value={languageContextValue}>
+      {gameSyncComponent}
+      {gameStage === GameStage.GameOver && winners.length > 0 && (
+        <WinScreen
+          winners={winners}
+          allPlayers={players}
+          onPlayAgain={resetGame}
+          summaryText={sageWisdom}
+        />
+      )}
+      <div
+        className={`game-wrapper min-h-screen bg-gradient-to-br from-amber-50 via-orange-100 to-amber-100 text-stone-700`}
+        style={customBackground ? { backgroundImage: `url(${customBackground})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : {}}
+      >
+        <header className="mb-6 text-center pt-4">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-red-600 drop-shadow-sm tracking-tight bg-white/80 rounded-lg px-4 inline-block backdrop-blur-sm">
+            {translate('app_title')}
+          </h1>
+        </header>
+
+        <main className="flex flex-col lg:flex-row gap-8 w-full max-w-7xl justify-center mx-auto px-4">
+          <div className="flex-grow flex justify-center items-start lg:order-1 relative perspective-container">
+            <Board squares={boardSquares} players={players} activeSpecialSquare={activeSpecialSquare} />
+          </div>
+
+          <aside className="lg:w-80 space-y-4 lg:order-2 flex flex-col">
+            <div className="bg-white/60 backdrop-blur-xl p-4 sm:p-5 rounded-2xl shadow-[0_8px_32px_rgba(31,38,135,0.15)] border border-white/20">
+              <GameControls
+                onRollDice={handleRollDice}
+                diceValue={diceValue}
+                isGameOver={gameStage === GameStage.GameOver || (currentPlayerDataForDisplay?.hasFinished ?? false)}
+                isAnimating={animationState !== null || (currentPlayerDataForDisplay?.isComputer ?? false) || isProcessingTurn}
+                currentPlayerName={currentPlayerDataForDisplay && !currentPlayerDataForDisplay.hasFinished ? currentPlayerDataForDisplay.name : undefined}
+              />
+
+              <div className="my-4">
+                <SageCommentary
+                  text={sageWisdom}
+                  isLoading={isSageThinking}
+                  isSpeaking={isSageSpeaking}
+                  onStop={stopSageAudio}
+                  onReplay={replaySageAudio}
+                />
+              </div>
+
+              <GameMessage gameMessageKey={gameMessageKey} replacements={messageReplacements} />
+
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:text-sm">
+                {players.map(p => (
+                  <div key={p.id} className="p-2 bg-white/70 rounded-lg shadow-sm border border-stone-100 flex items-center justify-between">
+                    <span style={{ color: p.color.tailwindClass.replace('bg-', 'text-').replace('-500', '-700') }} className="font-bold flex items-center gap-1">
+                      {p.name} {p.isComputer && <span className="text-xs">🤖</span>}
+                    </span>
+                    <div className="flex flex-col items-end">
+                      <span className="font-mono bg-stone-100 px-1.5 rounded text-stone-600">
+                        {p.position === PLAYER_INITIAL_POSITION && !p.hasStarted ? '-' :
+                          p.hasFinished ? '✓' :
+                            p.position}
+                      </span>
+                      {p.consecutiveWins >= 3 && !p.isComputer && (
+                        <span className="text-[0.6rem] text-orange-600 font-bold" title="3+ Win Streak: Auto-entry">
+                          ★ Veteran
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
+              <HistoryLog titleKey="message_history_title" items={messageHistory} emptyLogMessageKey="empty_message_history" />
+              <Leaderboard />
+            </div>
+
+            <GameSettingsPanel
+              sageVoice={sageVoice}
+              onVoiceChange={setSageVoice}
+              onBackgroundUpload={handleBackgroundUpload}
+              onBackgroundClear={handleBackgroundClear}
+              currentBackground={customBackground}
+              isMuted={isMuted}
+              onToggleMute={toggleMute}
+            />
+
+            <button
+              onClick={resetGame}
+              disabled={animationState !== null || isProcessingTurn}
+              className="w-full p-3 mt-4 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md transition-colors duration-150 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:opacity-60 disabled:cursor-not-allowed"
+              title={translate('reset_game')}
+              aria-label={translate('reset_game')}
+            >
+              <FaRedo className="text-lg" /> {translate('reset_game')}
+            </button>
+
+          </aside>
+        </main>
+        <footer className="mt-8 text-center text-xs sm:text-sm text-stone-500 bg-white/50 backdrop-blur-sm py-2 w-full rounded-t-lg">
+          <p>&copy; 2025 VoidPrakash. DharmaYatra Snakes & Ladders 2D.</p>
+        </footer>
+        {flashMessageText && (
+          <FlashMessage
+            message={flashMessageText}
+            onComplete={() => setFlashMessageText(null)}
+          />
+        )}
+      </div>
+    </LanguageContext.Provider>
+  );
+};
+
+export default App;

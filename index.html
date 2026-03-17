@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DharmaYatra Snakes & Ladders 2D</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&family=Noto+Sans+Devanagari:wght@400;700&family=Noto+Sans+Bengali:wght@400;700&family=Noto+Sans+Tamil:wght@400;700&family=Noto+Sans+Telugu:wght@400;700&family=Noto+Sans+Kannada:wght@400;700&family=Noto+Sans+Gujarati:wght@400;700&family=Noto+Sans+Gurmukhi:wght@400;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      plugins: [
+        require('tailwind-scrollbar'),
+      ],
+      variants: {
+        scrollbar: ['rounded']
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Noto Sans', 'Noto Sans Devanagari', sans-serif; /* Default stack */
+    }
+    .font-noto-sans { font-family: 'Noto Sans', sans-serif; }
+    .font-noto-devanagari { font-family: 'Noto Sans Devanagari', 'Noto Sans', sans-serif; }
+    .font-noto-bengali { font-family: 'Noto Sans Bengali', 'Noto Sans', sans-serif; }
+    .font-noto-tamil { font-family: 'Noto Sans Tamil', 'Noto Sans', sans-serif; }
+    .font-noto-telugu { font-family: 'Noto Sans Telugu', 'Noto Sans', sans-serif; }
+    .font-noto-kannada { font-family: 'Noto Sans Kannada', 'Noto Sans', sans-serif; }
+    .font-noto-gujarati { font-family: 'Noto Sans Gujarati', 'Noto Sans', sans-serif; }
+    .font-noto-gurmukhi { font-family: 'Noto Sans Gurmukhi', 'Noto Sans', sans-serif; }
+
+    /* For better animal icon visibility on colored backgrounds */
+    .animal-icon-on-peg {
+        filter: drop-shadow(0 0 1px rgba(0,0,0,0.7));
+    }
+
+    /* Dice Bounce Animation (post-roll) */
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-8px) scale(1.1); }
+    }
+    .animate-dice-bounce {
+      animation: bounce 0.4s ease-in-out;
+    }
+
+    /* Player Peg Transition */
+    .player-peg {
+      transition: all 0.4s ease-in-out, transform 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+    }
+
+    /* Dice Shake Animation (pre-roll) */
+    .shake {
+      animation: shake 0.6s;
+    }
+    @keyframes shake {
+      0% { transform: rotate(0deg); }
+      15% { transform: rotate(10deg); }
+      30% { transform: rotate(-10deg); }
+      45% { transform: rotate(8deg); }
+      60% { transform: rotate(-8deg); }
+      75% { transform: rotate(5deg); }
+      90% { transform: rotate(-5deg); }
+      100% { transform: rotate(0deg); }
+    }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "react": "https://esm.sh/react@^19.1.0",
+    "react-icons/": "https://esm.sh/react-icons@^5.5.0/",
+    "react-icons/fa": "https://esm.sh/react-icons@^5.5.0/fa",
+    "react-icons/gi": "https://esm.sh/react-icons@^5.5.0/gi",
+    "react-icons/im": "https://esm.sh/react-icons@^5.5.0/im",
+    "react-icons": "https://esm.sh/react-icons@^5.5.0",
+    "tailwind-scrollbar": "https://esm.sh/tailwind-scrollbar@^3.1.0",
+    "howler": "https://esm.sh/howler@2.2.4",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js",
+    "firebase/database": "https://www.gstatic.com/firebasejs/10.12.1/firebase-database.js",
+    "firebase/functions": "https://www.gstatic.com/firebasejs/10.12.1/firebase-functions.js",
+    "firebase/": "https://esm.sh/firebase@^11.9.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-amber-50 text-stone-800">
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
