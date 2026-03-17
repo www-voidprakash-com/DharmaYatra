@@ -135,7 +135,7 @@ const Square: React.FC<SquareProps> = ({ data, activeEffect }) => {
       {showTooltip && tooltipText && (
         <div
           className={`absolute left-1/2 transform -translate-x-1/2 px-3 py-2 bg-[#2d1b0e] text-[#fef3c7] text-xs rounded-md shadow-[0_4px_12px_rgba(0,0,0,0.5)] border border-[#d4af37] z-[70] backdrop-blur-sm pointer-events-none animate-fade-in-up font-serif
-            ${data.id > 90 ? 'top-full mt-2' : 'bottom-full mb-2'}
+            ${data.id > 80 ? 'top-full mt-2' : 'bottom-full mb-2'}
             whitespace-normal max-w-[150px] break-words text-center leading-tight
           `}
           role="tooltip"
@@ -143,7 +143,7 @@ const Square: React.FC<SquareProps> = ({ data, activeEffect }) => {
           {tooltipText}
           <div
             className={`absolute left-1/2 transform -translate-x-1/2 border-4 border-transparent 
-              ${data.id > 90 ? 'bottom-full border-b-[#2d1b0e]' : 'top-full border-t-[#2d1b0e]'}
+              ${data.id > 80 ? 'bottom-full border-b-[#2d1b0e]' : 'top-full border-t-[#2d1b0e]'}
             `}
           ></div>
         </div>

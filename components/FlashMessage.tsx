@@ -1,33 +1,31 @@
 import React, { useEffect, useState } from 'react';
-import { useLanguage } from '../App';
 import { Howl } from 'howler';
 
 interface FlashMessageProps {
     message: string;
     duration?: number;
     onComplete?: () => void;
+    isMuted?: boolean;
 }
 
-const FlashMessage: React.FC<FlashMessageProps> = ({ message, duration = 3000, onComplete }) => {
+const FlashMessage: React.FC<FlashMessageProps> = ({ message, duration = 3000, onComplete, isMuted = false }) => {
     const [isVisible, setIsVisible] = useState(false);
 
     useEffect(() => {
         setIsVisible(true);
 
-        // Play a subtle notification sound
-        const sound = new Howl({
-            src: ['data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVMAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIwAXFxcXGxsbGx8fHx8jIyMjJxcXFxsfHx8jIyMjJycnJysfHx8jJycnKysrKy8vLy8jJycnKysrLy8vLzMzMzMnqy8vLzMzMzM3Nzc3Ozs7Ky8vLzMzMzM3Nzc7Ozs7Pz8/PzMzMzM3Nzc7Ozs/Pz8/Q0NDQzc3Nzs7Oz8/P0NDQ0NHR0dHOzs7Pz8/Q0NDR0dHR0tLS0s/Pz9DQ0NHR0dLS0tLT09PT0NDQ0dHR0tLS09PT09TU1NHR0dLS0tPT09TU1NUMzMz//OEAAABpAABAAAAAAABFATEAAAAAAAAAAAdhpAAAAAAAAC78EBQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/gAAAAA//OEwAAALsAQAAAAAAABGAlIAAAAAAALvwQFA4CwWBwKBQCAQCAQAgDDkY//u3//7nH///7v/+3f/goBYAAA1fnBMRONH/5wTATjR/+FA4CwWBwKBQCAQCAQAgDDkY//u3//7nH///7v/+3f/goBYAAA1fnBMRONH/5wTATjR/+FA4CwWBwKBQCAQCAQAgDDkY//u3//7nH///7v/+3f/goBYAAA1fnBMRONH/5wTATjR/+FA4CwWBwKBQCAQCAQAgDDkY//u3//7nH///7v/+3f/goBYAAA1fnBMRONH/5wTATjR/+FA4CwWBwKBQCAQCAQAgDDkY//u3//7nH///7v/+3f/goBYAAA1fnBMRONH/5wTATjR/+FA4CwWBwKBQCAQCAQAgDDkY//u3//7nH///7v/+3f/goBYAAA1fnBMRONH/5wTATjR/+FA4CwWBwKBQCAQCAQAgDDkY//u3//7nH///7v/+3f/goBYAAA1fnBMRONH/5wTATjR/+AAAAAD/84TAAAAuABIAAAAAAAEYC0gAAAAAAAu/BAUDgLBYHAoFAIBAIBA CAMORj/+7f//ucf///u//7d/+CgFgAADV+cExE40f/nBMBONH/4UDgLBYHAoFAIBAIBA CAMORj/+7f//ucf///u//7d/+CgFgAADV+cExE40f/nBMBONH/4UDgLBYHAoFAIBAIBA CAMORj/+7f//ucf///u//7d/+CgFgAADV+cExE40f/nBMBONH/4UDgLBYHAoFAIBAIBA CAMORj/+7f//ucf///u//7d/+CgFgAADV+cExE40f/nBMBONH/4UDgLBYHAoFAIBAIBA CAMORj/+7f//ucf///u//7d/+CgFgAADV+cExE40f/nBMBONH/4UDgLBYHAoFAIBAIBA CAMORj/+7f//ucf///u//7d/+CgFgAADV+cExE40f/nBMBONH/4UDgLBYHAoFAIBAIBA CAMORj/+7f//ucf///u//7d/+CgFgAADV+cExE40f/nBMBONH/4AAAAAP/zhMAAAC4AGgAAAAAAARgOSAAAAAAAC78EBQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/gAAAAA//OEwAAALgAiAAAAAAAARgRSAAAAAAAC78EBQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/hQOAsFgcCgUAgEAgEAIAw5GP/7t//+5x///+7//t3/4KAWAAANX5wTETjR/+cEwE40f/gAAAAA'],
-            volume: 0.5
-        });
-        sound.play();
+        // Audio removed to prevent double-voice with Sage Commentary
+        // We now rely solely on Sage's voice and the optional replay button
 
         const timer = setTimeout(() => {
             setIsVisible(false);
             setTimeout(() => onComplete && onComplete(), 500); // Wait for fade out
         }, duration);
 
-        return () => clearTimeout(timer);
-    }, [message, duration, onComplete]);
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [message, duration, onComplete, isMuted]);
 
     return (
         <div

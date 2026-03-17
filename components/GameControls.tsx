@@ -9,6 +9,7 @@ interface GameControlsProps {
   isGameOver: boolean;
   isAnimating: boolean;
   currentPlayerName?: string;
+  currentPlayerProfilePic?: string;
 }
 
 const GameControls: React.FC<GameControlsProps> = ({
@@ -17,6 +18,7 @@ const GameControls: React.FC<GameControlsProps> = ({
   isGameOver,
   isAnimating,
   currentPlayerName,
+  currentPlayerProfilePic,
 }) => {
   const { translate } = useLanguage();
   const diceRollerRef = useRef<DiceRollerRef>(null);
@@ -51,9 +53,15 @@ const GameControls: React.FC<GameControlsProps> = ({
   return (
     <div className="space-y-2">
       {currentPlayerName && !isGameOver && (
-        <div className="text-center mb-1">
-          <p className="text-md font-semibold text-orange-700 flex items-center justify-center">
-            <FaUserAlt className="mr-2 text-sm" />
+        <div className="text-center mb-1 flex justify-center items-center gap-2">
+          {currentPlayerProfilePic ? (
+            <img src={currentPlayerProfilePic} alt="Profile" className="w-8 h-8 rounded-full object-cover border border-orange-300 shadow-sm" />
+          ) : (
+            <div className="bg-orange-100 rounded-full p-1.5 px-2.5">
+              <FaUserAlt className="text-orange-600 text-sm" />
+            </div>
+          )}
+          <p className="text-md font-semibold text-orange-700">
             {translate('current_player_turn', { playerName: currentPlayerName })}
           </p>
         </div>

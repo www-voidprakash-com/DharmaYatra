@@ -1,5 +1,8 @@
 
 import React, { useState, useCallback, useMemo, createContext, useContext, useEffect, useRef } from 'react';
+import { useAudioEngine } from './hooks/useAudioEngine';
+import { useSageCommentary, getVoicePersona } from './hooks/useSageCommentary';
+import { resizeImage } from './utils/imageUtils';
 import { Language, SquareData, SquareType, Player, GameStage, LanguageOption, MessageHistoryEntry, TurnHistoryEntry } from './types';
 import { BOARD_SIZE, PLAYER_INITIAL_POSITION, PLAYER_BOARD_START_POSITION, SNAKES_LADDERS_MAP, TRANSLATIONS, AVAILABLE_LANGUAGES, AVAILABLE_COLORS, AVAILABLE_ANIMAL_ICONS, AVAILABLE_VOICES } from './constants';
 import Board from './components/Board';
@@ -14,6 +17,7 @@ import GameStateSync from './components/GameStateSync';
 import Leaderboard from './components/Leaderboard';
 import FlashMessage from './components/FlashMessage';
 import SageCommentary from './components/SageCommentary';
+import LegalFooter from './components/LegalFooter';
 import { Howl, Howler } from 'howler';
 import { db, functions } from './firebase';
 import { ref, set, get, update } from 'firebase/database';
@@ -45,7 +49,7 @@ export const useLanguage = (): LanguageContextType => {
   return context;
 };
 
-const TURN_ADVANCE_DELAY = 3500; // Increased to allow listening to AI commentary
+const TURN_ADVANCE_DELAY = 3500; // Default base delay
 const HOP_DURATION = 200; // ms for each square hop
 const SL_ANIMATION_DURATION = 400; // ms for snake/ladder slide visual
 const MAX_HISTORY_ITEMS = 50; // Optimization: Limit log size
@@ -71,56 +75,14 @@ interface AnimationState {
   isStartingMove: boolean; // Was this the move to get on the board?
 }
 
-// --- Audio Helper Functions for Gemini PCM ---
-function base64ToUint8Array(base64: string): Uint8Array {
-  const binaryString = atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
-}
+// --- Audio Helper Functions moved to useAudioEngine ---
 
-function pcmToAudioBuffer(
-  data: Uint8Array,
-  ctx: AudioContext,
-  sampleRate: number = 24000
-): AudioBuffer {
-  const dataInt16 = new Int16Array(data.buffer);
-  const numChannels = 1; // Gemini TTS usually returns mono
-  const frameCount = dataInt16.length / numChannels;
-  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+// getVoicePersona removed (imported from hook)
 
-  for (let channel = 0; channel < numChannels; channel++) {
-    const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) {
-      // Convert Int16 to Float32 [-1.0, 1.0]
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-    }
-  }
-  return buffer;
-}
-
-// Helper to get persona based on voice
-const getVoicePersona = (voiceName: string) => {
-  switch (voiceName) {
-    case 'Fenrir': return { role: 'mystical Himalayan Sage', style: 'wise, deep, ancient Indian phrasing using metaphors of karma and dharma', context: 'karmic journey' };
-    case 'Charon': return { role: 'distinguished Royal Historian', style: 'formal, slightly academic British English, referring to players as travelers in a grand chronicle', context: 'historical journey' };
-    case 'Kore': return { role: 'calm Canyon Guide', style: 'warm, clear American English with nature metaphors (rivers, mountains)', context: 'personal growth journey' };
-    case 'Zephyr': return { role: 'enthusiastic Outback Tracker', style: 'adventurous, upbeat Australian style, calling players "mate" and using adventure terms', context: 'wild adventure' };
-    case 'Puck': return { role: 'whimsical Celtic Bard', style: 'poetic, lyrical, slightly mischievous Irish style, speaking in riddles or rhymes', context: 'mythical tale' };
-    default: return { role: 'mystical Sage', style: 'wise and deep', context: 'journey' };
-  }
-};
-
-// AdMob Hook (Placeholder for Capacitor integration)
-const showInterstitialAd = async () => {
-  // TODO: In Capacitor build: await AdMob.showInterstitial();
-  console.log("AdMob: Interstitial Ad Triggered (Simulation)");
-};
+import { initializeAdMob, showInterstitial } from './services/admobService';
 
 const App = (): React.ReactElement => {
+  const { isMuted, toggleMute, initAudioContext, playAudio, stopAudio } = useAudioEngine();
   const [language, setLanguageState] = useState<Language>(Language.English);
   const [userNickname, setUserNickname] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -138,18 +100,43 @@ const App = (): React.ReactElement => {
   const [isProcessingTurn, setIsProcessingTurn] = useState<boolean>(false);
   const [customBackground, setCustomBackground] = useState<string | null>(null);
 
-  // Sage AI State
-  const [sageWisdom, setSageWisdom] = useState<string | null>(null);
-  const [isSageThinking, setIsSageThinking] = useState<boolean>(false);
-  const [isSageSpeaking, setIsSageSpeaking] = useState<boolean>(false);
-  const [aiQuotaExceeded, setAiQuotaExceeded] = useState<boolean>(false);
-  const [sageVoice, setSageVoice] = useState<string>('Fenrir');
-  const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [flashMessageText, setFlashMessageText] = useState<string | null>(null);
+  useEffect(() => {
+    initializeAdMob();
+  }, []);
 
-  // Audio Context Ref & Source Ref (to stop playback)
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  // Sage AI State & Hook
+  const [sageVoice, setSageVoice] = useState<string>('Fenrir');
+  const [flashMessageText, setFlashMessageText] = useState<string | null>(null);
+  const [userApiKey, setUserApiKey] = useState<string | null>(() => localStorage.getItem('dharmayatra_custom_api_key'));
+
+  const handleApiKeyChange = (key: string | null) => {
+    setUserApiKey(key);
+    if (key) {
+      localStorage.setItem('dharmayatra_custom_api_key', key);
+    } else {
+      localStorage.removeItem('dharmayatra_custom_api_key');
+    }
+  };
+
+
+  // Phase 1: Room ID State Persistence
+  const [roomId, setRoomId] = useState<string>(() => {
+    const stored = localStorage.getItem('dharmayatra_room_id');
+    if (stored) return stored;
+    // Generate new random room ID if none exists
+    const newRoomId = 'room_' + Math.random().toString(36).substr(2, 9);
+    return newRoomId;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('dharmayatra_room_id', roomId);
+  }, [roomId]);
+
+
+
+
+
+  // Audio refs removed (using useAudioEngine)
   // Watch history for Flash Messages
   useEffect(() => {
     if (messageHistory.length > 0) {
@@ -159,8 +146,6 @@ const App = (): React.ReactElement => {
     }
   }, [messageHistory]);
   // Cache & Refs
-  const lastAudioBase64Ref = useRef<string | null>(null);
-  const summaryGeneratedRef = useRef<boolean>(false); // Prevent duplicate generation
   const isFinalizingMoveRef = useRef<boolean>(false); // Prevent double-execution of turn logic
 
   // Refs for auto-play logic
@@ -209,6 +194,28 @@ const App = (): React.ReactElement => {
     return translation;
   }, [language]);
 
+  const {
+    sageWisdom,
+    setSageWisdom,
+    isSageThinking,
+    isSageSpeaking,
+    aiQuotaExceeded,
+    setAiQuotaExceeded,
+    stopSageAudio,
+    replaySageAudio,
+    generateAndPlayCosmicSpeech,
+    generateAICommentary,
+    generateGameSummary,
+    resetSummaryGen
+  } = useSageCommentary({
+    language,
+    translate,
+    sageVoice,
+    playAudio,
+    stopAudio,
+    customApiKey: userApiKey
+  });
+
   const addMessageToHistory = useCallback((text: string) => {
     setMessageHistory(prev => {
       // Optimization: Deduplicate if same message added within 500ms (debounce)
@@ -235,14 +242,15 @@ const App = (): React.ReactElement => {
     });
   }, []);
 
-  const handleBackgroundUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBackgroundUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCustomBackground(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const resized = await resizeImage(file, 1280, 720, 0.7);
+        setCustomBackground(resized);
+      } catch (err) {
+        console.error("Image resize failed", err);
+      }
     }
   }, []);
 
@@ -250,238 +258,57 @@ const App = (): React.ReactElement => {
     setCustomBackground(null);
   }, []);
 
-  // Initialize AudioContext on user interaction
-  const initAudioContext = () => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
-    }
-  };
+  // Phase 1: Reset Nickname defined below
 
-  // Immediate stop function
-  const stopSageAudio = useCallback(() => {
-    if (audioSourceRef.current) {
-      try {
-        audioSourceRef.current.stop();
-      } catch (e) {
-        // ignore if already stopped
-      }
-      audioSourceRef.current = null;
-    }
-    setIsSageSpeaking(false);
+
+  // Phase 1: Reset Nickname (and clear game state derived from it)
+  // Moved here to access setRoomId and other state refs if needed
+  const handleResetNickname = useCallback(() => {
+    localStorage.removeItem('dharmayatra_nickname');
+    setUserNickname(null);
+    setGameStage(GameStage.Setup);
+    setRoomId('public-room'); // Reset room ID on nickname reset to default
   }, []);
+
+  // Phase 1: Sage Controls
+  // Moved here because it depends on stopSageAudio
+  const dismissSageMessage = useCallback(() => {
+    stopSageAudio();
+    setSageWisdom(null);
+    // isSageThinking handled in hook or ignored on dismiss
+    // lastAudioBase64Ref handled in hook
+  }, [stopSageAudio, setSageWisdom]);
 
   // Stop audio whenever the voice changes to prevent persona mismatch
   useEffect(() => {
     stopSageAudio();
   }, [sageVoice, stopSageAudio]);
 
-  // Core audio player function using cached base64
-  const playAudioFromBase64 = useCallback((base64Audio: string) => {
-    stopSageAudio();
-    if (isMuted) return; // Prevent playback if muted
-
-    initAudioContext();
-
-    if (!audioContextRef.current) return;
-
-    setIsSageSpeaking(true);
-
-    try {
-      const ctx = audioContextRef.current;
-      const rawBytes = base64ToUint8Array(base64Audio);
-      const audioBuffer = pcmToAudioBuffer(rawBytes, ctx, 24000);
-
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-
-      // Just slightly slow down for cosmic deepness
-      source.playbackRate.value = 0.95;
-
-      source.connect(ctx.destination);
-
-      audioSourceRef.current = source;
-      source.start();
-
-      source.onended = () => {
-        // Only reset state if this is still the active source
-        if (audioSourceRef.current === source) {
-          setIsSageSpeaking(false);
-          audioSourceRef.current = null;
-        }
-      };
-    } catch (e) {
-      console.warn("Audio playback failed", e);
-      setIsSageSpeaking(false);
-    }
-  }, [stopSageAudio]);
-
-  const toggleMute = useCallback(() => {
-    setIsMuted(prev => {
-      const newState = !prev;
-      Howler.mute(newState);
-      if (newState) {
-        stopSageAudio();
-      }
-      return newState;
-    });
-  }, [stopSageAudio]);
 
 
-  // Replay function
-  const replaySageAudio = useCallback(() => {
-    if (lastAudioBase64Ref.current) {
-      playAudioFromBase64(lastAudioBase64Ref.current);
-    }
-  }, [playAudioFromBase64]);
 
 
-  const generateAndPlayCosmicSpeech = async (text: string) => {
-    stopSageAudio(); // Ensure any running audio stops
-
-    if (aiQuotaExceeded) return;
-
-    // Set UI to speaking tentatively while we fetch audio
-    setIsSageSpeaking(true);
-    lastAudioBase64Ref.current = null; // Reset cache
-
-    // Use Firebase Function wrapper instead of direct client call
-    try {
-      const generateSpeech = httpsCallable(functions, 'generateSpeech');
-      const response: any = await generateSpeech({ text, voiceName: sageVoice });
-      const base64Audio = response.data.audioContent;
-
-      if (base64Audio) {
-        lastAudioBase64Ref.current = base64Audio;
-        playAudioFromBase64(base64Audio);
-      } else {
-        setIsSageSpeaking(false);
-      }
-
-    } catch (error) {
-      console.warn("TTS Error via Cloud Function:", error);
-      setIsSageSpeaking(false);
-    }
-  };
-
-  const generateAICommentary = useCallback(async (
-    player: Player,
-    squareId: number,
-    eventType: 'snake' | 'ladder' | 'win' | 'start' | 'extra',
-    squareName: string,
-    rawSLKey?: string
-  ) => {
-    // Immediate fallback if key missing or previous quota error
-    if (aiQuotaExceeded) {
-      setSageWisdom(translate(`sage_fallback_${eventType === 'start' ? 'ladder' : eventType === 'extra' ? 'extra' : eventType}`, { playerName: player.name }));
-      return;
-    }
-
-    setIsSageThinking(true);
-    setSageWisdom(null);
-    stopSageAudio();
-    lastAudioBase64Ref.current = null;
-
-    const slDescription = rawSLKey ? translate(rawSLKey, {
-      playerName: player.name,
-      playerColorName: translate(player.color.nameKey),
-      playerAnimalName: translate(player.animalIcon.nameKey)
-    }) : '';
-
-    const persona = getVoicePersona(sageVoice);
-
-    const prompt = `
-      You are a ${persona.role} narrating a game of 'DharmaYatra' (Snakes & Ladders).
-      Event Details: Player "${player.name}", Event ${eventType.toUpperCase()}, Square ${squareId} (${squareName}), Context: ${slDescription}.
-      Language: ${language}.
-      Task: Provide a 1-sentence commentary. Deep, engaging, paced. Max 20 words.
-    `;
-
-    try {
-      // Use Firebase Cloud Function for security
-      const generateCommentary = httpsCallable(functions, 'generateCommentary');
-      const result: any = await generateCommentary({ prompt });
-
-      if (result.data.text) {
-        const finalText = result.data.text;
-        setSageWisdom(finalText);
-        generateAndPlayCosmicSpeech(finalText);
-      } else {
-        throw new Error("Empty AI response");
-      }
-    } catch (error: any) {
-      console.warn("Cloud Function AI failed.", error);
-      // Fallback to offline text
-      setSageWisdom(translate(`sage_fallback_${eventType === 'start' ? 'ladder' : eventType === 'extra' ? 'extra' : eventType}`, { playerName: player.name }));
-    } finally {
-      setIsSageThinking(false);
-    }
-  }, [language, translate, aiQuotaExceeded, sageVoice]);
-
-
-  const generateGameSummary = useCallback(async (winner: Player, allPlayers: Player[], gameTurnHistory: TurnHistoryEntry[]) => {
-    if (summaryGeneratedRef.current) return;
-    if (aiQuotaExceeded) return;
-
-    summaryGeneratedRef.current = true;
-    setIsSageThinking(true);
-    setSageWisdom(null);
-    stopSageAudio();
-
-    const losers = allPlayers.filter(p => p.id !== winner.id);
-    const winnerMoves = gameTurnHistory.filter(t => t.playerId === winner.id);
-    const winnerLadders = winnerMoves.filter(t => t.actionKey === 'turn_action_ladder').length;
-    const winnerSnakes = winnerMoves.filter(t => t.actionKey === 'turn_action_snake').length;
-
-    const loserStories = losers.map(loser => {
-      const moves = gameTurnHistory.filter(t => t.playerId === loser.id);
-      const snakeHits = moves.filter(t => t.actionKey === 'turn_action_snake').map(t => t.slType).filter(Boolean);
-      return {
-        name: loser.name,
-        vices: [...new Set(snakeHits)].slice(0, 2),
-        snakeCount: snakeHits.length
-      };
-    });
-
-    const persona = getVoicePersona(sageVoice);
-
-    const prompt = `
-        You are a ${persona.role} summarizing a finished game of DharmaYatra.
-        Winner: "${winner.name}" (Climbed ${winnerLadders} Ladders, Fell to ${winnerSnakes} Snakes).
-        Others: ${JSON.stringify(loserStories)}.
-        Language: ${language}.
-        Task: Create a beautiful, cohesive story summarizing the karmic journey. Max 3-4 sentences.
-      `;
-
-    try {
-      const generateSummary = httpsCallable(functions, 'generateCommentary'); // Reusing commentary function or dedicated one
-      const result: any = await generateSummary({ prompt });
-
-      if (result.data.text) {
-        const finalText = result.data.text;
-        setSageWisdom(finalText);
-        generateAndPlayCosmicSpeech(finalText);
-      }
-    } catch (error) {
-      setSageWisdom(translate('sage_fallback_win', { playerName: winner.name }));
-    } finally {
-      setIsSageThinking(false);
-    }
-
-  }, [language, aiQuotaExceeded, stopSageAudio, sageVoice]);
 
 
   useEffect(() => {
     if (gameStage === GameStage.Setup && userNickname) {
-      addMessageToHistory(translate('msg_welcome'));
+      const welcomeMsg = translate('msg_welcome');
+      addMessageToHistory(welcomeMsg);
+      // Optional: Play welcome speech. Might be annoying on every setup load, maybe restriction needed?
+      // User requested "flash messages converting to sound".
+      // generateAndPlayCosmicSpeech(welcomeMsg); 
+      // Commented out to prevent auto-play spam on refresh/re-render, but enabling per user intent?
+      // Let's enable it but maybe check if we just started?
+      // For now, let's leave it manual or for the user to trigger via replay, OR enable it.
+      // User request is strong. Let's enable it with a small debounce/check?
+      // Actually, useEffect runs once on mount/stage change.
+      generateAndPlayCosmicSpeech(welcomeMsg);
     }
     // Reset the summary flag when setup starts
     if (gameStage === GameStage.Setup) {
-      summaryGeneratedRef.current = false;
+      resetSummaryGen();
     }
-  }, [gameStage, userNickname, translate, addMessageToHistory]);
+  }, [gameStage, userNickname, translate, addMessageToHistory, resetSummaryGen]);
 
   const boardSquares = useMemo((): SquareData[] => {
     return Array.from({ length: BOARD_SIZE }, (_, i) => {
@@ -506,20 +333,23 @@ const App = (): React.ReactElement => {
   const updatePlayerPositionInDB = useCallback((playerId: number, position: number) => {
     if (gameMode === 'practice') return; // Skip DB updates in practice
     if (!db) return;
-    const playerRef = ref(db, `game/players/${playerId}`);
-    set(playerRef, {
+
+    // Phase 1: Scoped to Room
+    const gamePlayerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
+
+    update(gamePlayerRef, {
       position: position,
       updatedAt: Date.now()
     }).catch(error => {
       console.error("Firebase: Failed to update player position:", error);
     });
-  }, [gameMode]);
+  }, [gameMode, db, roomId]);
 
   const updateGameResultInDB = useCallback(async (winnerName: string, allPlayers: Player[]) => {
     if (gameMode === 'practice') return; // Skip DB updates in practice
 
     // AdMob Trigger
-    showInterstitialAd();
+    showInterstitial();
 
     if (!db) return;
 
@@ -571,7 +401,7 @@ const App = (): React.ReactElement => {
       console.error("Firebase: Failed to perform bulk update for game results:", err);
     }
 
-  }, [gameMode]);
+  }, [gameMode, showInterstitial, db]);
 
   const handleRemoteGameStateUpdate = useCallback((remotePlayersData: AllFirebasePlayersData) => {
     if (gameMode === 'practice') return; // Do not listen to remote in practice
@@ -607,8 +437,8 @@ const App = (): React.ReactElement => {
     setSageWisdom(null);
     setIsProcessingTurn(false);
     stopSageAudio(); // Stop audio on reset
-    lastAudioBase64Ref.current = null; // Clear cache
-    summaryGeneratedRef.current = false; // Allow summary for next game
+    // lastAudioBase64Ref.current = null; // Handled by hook logic (cleared on new gen)
+    resetSummaryGen(); // Allow summary for next game
     setAiQuotaExceeded(false); // Reset AI quota state on new game
     if (userNickname) {
       addMessageToHistory(translate('msg_welcome'));
@@ -661,11 +491,13 @@ const App = (): React.ReactElement => {
     // Initial sync write - bypassing callback dependency state lag issue by inline logic
     if (!isPractice && db) {
       initialPlayers.forEach(player => {
-        const playerRef = ref(db, `game/players/${player.id}`);
+        // Sync initial state if needed
+        // Phase 1: Scoped to Room
+        const playerRef = ref(db, `rooms/${roomId}/players/${player.id}`);
         set(playerRef, {
           position: player.position,
           updatedAt: Date.now()
-        }).catch(e => console.error("Initial DB sync failed", e));
+        }).catch(e => console.error("Firebase set failed:", e));
       });
     }
 
@@ -694,12 +526,12 @@ const App = (): React.ReactElement => {
       }
     });
 
-  }, [translate, addMessageToHistory, setPlayers, setCurrentPlayerIndex, setDiceValue, setGameStage, setGameMessageKey, setMessageReplacements, addTurnToHistory]);
+  }, [translate, addMessageToHistory, setPlayers, setCurrentPlayerIndex, setDiceValue, setGameStage, setGameMessageKey, setMessageReplacements, addTurnToHistory, db, roomId]);
 
   const advanceToNextPlayer = useCallback(() => {
     setSageWisdom(null); // Clear wisdom on next turn
     stopSageAudio(); // Stop audio on turn change
-    lastAudioBase64Ref.current = null; // Clear cache for new turn
+    // lastAudioBase64Ref.current = null; // Clear cache for new turn - Handled/Ignored
     setCurrentPlayerIndex(prevIndex => {
       let nextIndex = (prevIndex + 1) % players.length;
       const startIndexLoopCheck = nextIndex;
@@ -791,20 +623,13 @@ const App = (): React.ReactElement => {
     };
     let turnActionKey = '';
     let turnActionDetails: string | undefined = undefined;
+    let aiEventType: 'snake' | 'ladder' | 'win' | 'start' | 'extra' | 'snake_extra' | 'ladder_extra' | 'normal' = 'normal';
+    let aiEventDetail = ''; // Name of square or S/L key
+    let aiRawSLKey = undefined;
 
     const slInfo = SNAKES_LADDERS_MAP[landedOnDiceSquare];
 
-    // Trigger AI Commentary
-    if (wasSL && slInfo) {
-      generateAICommentary(
-        playerToUpdate,
-        landedOnDiceSquare,
-        slInfo.type,
-        translate(slInfo.key),
-        slInfo.key
-      );
-    }
-
+    // 1. Determine Board Event (Visuals & Primary Message)
     if (wasStartingMove) {
       // Veteran logic disabled for practice or if not applicable
       const wasVeteranStart = (gameMode === 'multiplayer' && rolledDice !== 1 && rolledDice !== 6 && playerToUpdate.consecutiveWins >= 3);
@@ -813,7 +638,8 @@ const App = (): React.ReactElement => {
       localMessageReplacements.diceValue = rolledDice;
       turnActionKey = wasVeteranStart ? 'turn_action_started_veteran' : 'turn_action_started_journey';
       turnActionDetails = `${finalPos}`;
-      generateAICommentary(playerToUpdate, 1, 'start', 'Janma');
+      aiEventType = 'start';
+      aiEventDetail = 'Janma';
     } else if (wasSL && slInfo) {
       const translatedColorName = translate(playerToUpdate.color.nameKey);
       const translatedAnimalName = translate(playerToUpdate.animalIcon.nameKey);
@@ -828,22 +654,28 @@ const App = (): React.ReactElement => {
       localMessageReplacements.newPosition = finalPos;
       turnActionKey = slInfo.type === 'snake' ? 'turn_action_snake' : 'turn_action_ladder';
       turnActionDetails = `${landedOnDiceSquare} -> ${finalPos}`;
+      aiEventType = slInfo.type === 'snake' ? 'snake' : 'ladder';
+      aiEventDetail = slInfo.key;
+      aiRawSLKey = slInfo.key;
+
       if (slInfo.type === 'snake') snakeSound.play(); else ladderSound.play();
     } else {
       localMessageKey = 'msg_landed_on';
       localMessageReplacements.position = finalPos;
       turnActionKey = 'turn_action_moved';
+      aiEventType = 'normal'; // Usually no commentary for normal moves, but we might want it if context is special
     }
 
     let hasPlayerFinished = false;
 
+    // 2. Check Win Condition
     if (finalPos === BOARD_SIZE) {
       if (!playerToUpdate.hasFinished) {
         winSound.play();
         updateGameResultInDB(playerToUpdate.name, updatedPlayersArray);
-        if (updatedPlayersArray.filter(p => !p.hasFinished).length > 1) {
-          generateAICommentary(playerToUpdate, 100, 'win', 'Poorna');
-        }
+        // Win always overrides other commentary
+        aiEventType = 'win';
+        aiEventDetail = 'Poorna';
       }
       playerToUpdate.hasFinished = true;
       hasPlayerFinished = true;
@@ -858,14 +690,34 @@ const App = (): React.ReactElement => {
 
     const hasExtraTurn = (rolledDice === 6 && !playerToUpdate.hasFinished && finalPos !== BOARD_SIZE);
 
-    if (hasExtraTurn) {
-      localMessageKey = 'msg_extra_turn';
+    // 3. Handle Extra Turn Logic (Update AI Event & Queue Messages)
+    let messagesToLog: string[] = [];
+
+    // First push the primary event message
+    if (localMessageKey) {
+      messagesToLog.push(translate(localMessageKey, localMessageReplacements));
     }
 
-    // UPDATE STATE ONCE
+    if (hasExtraTurn) {
+      // Append extra turn message
+      const extraMsg = translate('msg_extra_turn', { playerName: playerToUpdate.name });
+      messagesToLog.push(extraMsg);
+
+      // Upgrade AI Event Type
+      if (aiEventType === 'snake') aiEventType = 'snake_extra';
+      else if (aiEventType === 'ladder') aiEventType = 'ladder_extra';
+      else if (aiEventType === 'normal') aiEventType = 'extra';
+      // If win/start, keep as is or barely relevant for start-extra
+    }
+
+    // UPDATE STATE -> Show primary message on UI
     setGameMessageKey(localMessageKey);
     setMessageReplacements(localMessageReplacements);
-    addMessageToHistory(translate(localMessageKey, localMessageReplacements));
+
+    // Log ALL queued history messages
+    messagesToLog.forEach(msg => {
+      addMessageToHistory(msg);
+    });
 
     const newTurnEntry = {
       playerId: pId,
@@ -894,24 +746,51 @@ const App = (): React.ReactElement => {
 
     setPlayers(updatedPlayersArray);
 
+    // TRIGGER AI COMMENTARY (Consolidated)
+    if (aiEventType !== 'normal') {
+      // Map valid event types to the function's expected string
+      // NOTE: We'll need to handle 'snake_extra' inside generateAICommentary or pass 'extra' and rely on prompt
+      // For now, let's pass a custom logic or just use the primary event and append context in prompt if we can
+      // But based on current signature:
+      // generateAICommentary(player, squareId, eventType, squareName, rawSLKey)
+
+      // We will pass the composite eventType string. We need to ensure generateAICommentary handles it or we update it.
+      // Since generateAICommentary signature types are strict, let's cast or update the function if needed.
+      // Looking at the function, it takes string.
+      generateAICommentary(
+        playerToUpdate,
+        landedOnDiceSquare,
+        aiEventType as any, // Cast to allow new composite types
+        aiEventDetail || `${finalPos}`,
+        aiRawSLKey
+      );
+    } else {
+      // For normal events where Sage doesn't speak, read the flash message text
+      const normalMsg = translate(localMessageKey, localMessageReplacements);
+      generateAndPlayCosmicSpeech(normalMsg);
+    }
+
     // SIDE EFFECTS (Turn Advance)
     const activePlayersLeft = updatedPlayersArray.filter(p => !p.hasFinished);
 
-    if (activePlayersLeft.length === 0 && updatedPlayersArray.length > 0) {
-      // Game Over handled by effect
+    if (!hasExtraTurn) {
+      const delay = isMuted ? 1500 : TURN_ADVANCE_DELAY;
+      const turnTimer = setTimeout(() => {
+        advanceToNextPlayer();
+      }, delay);
+      return () => clearTimeout(turnTimer);
     } else if (!playerToUpdate.hasFinished) {
       if (hasExtraTurn) {
-        generateAICommentary(playerToUpdate, finalPos, 'extra', 'Extra Turn');
         // If it's an extra turn, unlock processing so computer (or player) can roll again immediately
         setIsProcessingTurn(false);
       } else {
-        setTimeout(() => advanceToNextPlayer(), TURN_ADVANCE_DELAY);
+        setTimeout(() => advanceToNextPlayer(), isMuted ? 1500 : TURN_ADVANCE_DELAY);
       }
     } else if (activePlayersLeft.length > 0 && playerToUpdate.hasFinished) {
-      setTimeout(() => advanceToNextPlayer(), TURN_ADVANCE_DELAY);
+      setTimeout(() => advanceToNextPlayer(), isMuted ? 1500 : TURN_ADVANCE_DELAY);
     }
 
-  }, [players, winners, translate, addMessageToHistory, addTurnToHistory, updatePlayerPositionInDB, updateGameResultInDB, advanceToNextPlayer, setWinners, setGameMessageKey, setMessageReplacements, generateAICommentary, snakeSound, ladderSound, winSound, gameMode]);
+  }, [players, winners, translate, addMessageToHistory, addTurnToHistory, updatePlayerPositionInDB, updateGameResultInDB, advanceToNextPlayer, setWinners, setGameMessageKey, setMessageReplacements, generateAICommentary, snakeSound, ladderSound, winSound, gameMode, isMuted]);
 
   // Ref to hold the latest version of finalizeAndLogMove
   const finalizeMoveRef = useRef(finalizeAndLogMove);
@@ -986,7 +865,7 @@ const App = (): React.ReactElement => {
     setIsProcessingTurn(true); // Lock the turn logic
     setSageWisdom(null); // Reset wisdom on new roll
     stopSageAudio(); // Stop old audio on new roll
-    lastAudioBase64Ref.current = null; // Clear cache
+    // lastAudioBase64Ref.current = null; // Clear cache - Handled internally/ignored
     setDiceValue(rolledValue);
     diceSound.play();
 
@@ -1013,6 +892,10 @@ const App = (): React.ReactElement => {
         setMessageReplacements(failMsgReplacements);
         addMessageToHistory(translate(failMsgKey, failMsgReplacements));
         addTurnToHistory({ playerId: currentPlayer.id, playerName: currentPlayer.name, diceValue: rolledValue, startPosition: turnStartPos, endPosition: turnStartPos, actionKey: 'turn_action_failed_to_start' });
+
+        // Audio feedback
+        generateAndPlayCosmicSpeech(translate(failMsgKey, failMsgReplacements));
+
         setTimeout(() => advanceToNextPlayer(), 1500); // Shorter delay for simple fail
         return;
       }
@@ -1029,6 +912,10 @@ const App = (): React.ReactElement => {
         setMessageReplacements(overshootMsgReplacements);
         addMessageToHistory(translate(overshootMsgKey, overshootMsgReplacements));
         addTurnToHistory({ playerId: currentPlayer.id, playerName: currentPlayer.name, diceValue: rolledValue, startPosition: turnStartPos, endPosition: currentPlayer.position, actionKey: 'turn_action_overshot' });
+
+        // Audio feedback
+        generateAndPlayCosmicSpeech(translate(overshootMsgKey, overshootMsgReplacements));
+
         setTimeout(() => advanceToNextPlayer(), 1500); // Shorter delay for simple overshoot
         return;
       }
@@ -1064,12 +951,16 @@ const App = (): React.ReactElement => {
     };
   }, [setAnimationState]);
 
+
   const handleNicknameSubmit = useCallback((nickname: string) => {
     setUserNickname(nickname);
+    localStorage.setItem('dharmayatra_nickname', nickname);
     setGameMessageKey('msg_welcome');
     setMessageReplacements(undefined);
     addMessageToHistory(translate('msg_welcome'));
   }, [translate, addMessageToHistory, setUserNickname, setGameMessageKey, setMessageReplacements]);
+
+
 
   const languageContextValue = useMemo(() => ({
     language,
@@ -1091,13 +982,21 @@ const App = (): React.ReactElement => {
     return { id: turn.id, text };
   });
 
-  const gameSyncComponent = userNickname && gameMode === 'multiplayer' ? <GameStateSync onUpdate={handleRemoteGameStateUpdate} /> : null;
-
+  // The original `gameSyncComponent` variable is removed, and the component is rendered directly in JSX.
+  // The `roomId` prop is already included in the provided `GameStateSync` component.
 
   if (!userNickname) {
     return (
       <LanguageContext.Provider value={languageContextValue}>
-        <NicknameInput onSubmit={handleNicknameSubmit} initialNickname={userNickname} />
+        <div className="game-wrapper min-h-screen flex flex-col items-center bg-gradient-to-br from-amber-50 via-orange-100 to-amber-100">
+          <header className="mb-6 text-center pt-8">
+            <h1 className="text-4xl sm:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-red-600 drop-shadow-sm tracking-tight bg-white/80 rounded-lg px-6 py-2 inline-block backdrop-blur-sm">
+              {translate('app_title')}
+            </h1>
+          </header>
+          <NicknameInput onSubmit={handleNicknameSubmit} initialNickname={userNickname} />
+          <LegalFooter />
+        </div>
       </LanguageContext.Provider>
     );
   }
@@ -1105,15 +1004,27 @@ const App = (): React.ReactElement => {
   if (gameStage === GameStage.Setup) {
     return (
       <LanguageContext.Provider value={languageContextValue}>
-        {gameSyncComponent}
-        <PlayerSetup onStartGame={startGame} userNickname={userNickname} />
+        <div className="game-wrapper min-h-screen flex flex-col items-center bg-gradient-to-br from-amber-50 via-orange-100 to-amber-100">
+          <header className="mb-6 text-center pt-8">
+            <h1 className="text-4xl sm:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-red-600 drop-shadow-sm tracking-tight bg-white/80 rounded-lg px-6 py-2 inline-block backdrop-blur-sm">
+              {translate('app_title')}
+            </h1>
+          </header>
+          {userNickname && gameMode === 'multiplayer' && (
+            <GameStateSync roomId={roomId} onUpdate={handleRemoteGameStateUpdate} />
+          )}
+          <PlayerSetup onStartGame={startGame} userNickname={userNickname} />
+          <LegalFooter />
+        </div>
       </LanguageContext.Provider>
     );
   }
 
   return (
     <LanguageContext.Provider value={languageContextValue}>
-      {gameSyncComponent}
+      {userNickname && gameMode === 'multiplayer' && (
+        <GameStateSync roomId={roomId} onUpdate={handleRemoteGameStateUpdate} />
+      )}
       {gameStage === GameStage.GameOver && winners.length > 0 && (
         <WinScreen
           winners={winners}
@@ -1145,6 +1056,7 @@ const App = (): React.ReactElement => {
                 isGameOver={gameStage === GameStage.GameOver || (currentPlayerDataForDisplay?.hasFinished ?? false)}
                 isAnimating={animationState !== null || (currentPlayerDataForDisplay?.isComputer ?? false) || isProcessingTurn}
                 currentPlayerName={currentPlayerDataForDisplay && !currentPlayerDataForDisplay.hasFinished ? currentPlayerDataForDisplay.name : undefined}
+                currentPlayerProfilePic={currentPlayerDataForDisplay && !currentPlayerDataForDisplay.hasFinished ? currentPlayerDataForDisplay.profilePic : undefined}
               />
 
               <div className="my-4">
@@ -1154,6 +1066,8 @@ const App = (): React.ReactElement => {
                   isSpeaking={isSageSpeaking}
                   onStop={stopSageAudio}
                   onReplay={replaySageAudio}
+                  onDismiss={dismissSageMessage}
+                  quotaExceeded={aiQuotaExceeded}
                 />
               </div>
 
@@ -1162,7 +1076,15 @@ const App = (): React.ReactElement => {
               <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:text-sm">
                 {players.map(p => (
                   <div key={p.id} className="p-2 bg-white/70 rounded-lg shadow-sm border border-stone-100 flex items-center justify-between">
-                    <span style={{ color: p.color.tailwindClass.replace('bg-', 'text-').replace('-500', '-700') }} className="font-bold flex items-center gap-1">
+                    <span style={{ color: p.color.tailwindClass.replace('bg-', 'text-').replace('-500', '-700') }} className="font-bold flex items-center gap-2">
+                      {p.profilePic ? (
+                        <img src={p.profilePic} alt={p.name} className="w-8 h-8 rounded-full object-cover border border-stone-200" />
+                      ) : (
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs ${p.color.tailwindClass}`}>
+                          {p.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+
                       {p.name} {p.isComputer && <span className="text-xs">🤖</span>}
                     </span>
                     <div className="flex flex-col items-end">
@@ -1195,6 +1117,10 @@ const App = (): React.ReactElement => {
               currentBackground={customBackground}
               isMuted={isMuted}
               onToggleMute={toggleMute}
+              onResetNickname={handleResetNickname}
+              aiQuotaExceeded={aiQuotaExceeded}
+              customApiKey={userApiKey}
+              onApiKeyChange={handleApiKeyChange}
             />
 
             <button
@@ -1202,20 +1128,20 @@ const App = (): React.ReactElement => {
               disabled={animationState !== null || isProcessingTurn}
               className="w-full p-3 mt-4 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md transition-colors duration-150 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:opacity-60 disabled:cursor-not-allowed"
               title={translate('reset_game')}
-              aria-label={translate('reset_game')}
             >
-              <FaRedo className="text-lg" /> {translate('reset_game')}
+              <FaRedo size={18} /> {translate('reset_game')}
             </button>
 
           </aside>
         </main>
-        <footer className="mt-8 text-center text-xs sm:text-sm text-stone-500 bg-white/50 backdrop-blur-sm py-2 w-full rounded-t-lg">
-          <p>&copy; 2025 VoidPrakash. DharmaYatra Snakes & Ladders 2D.</p>
-        </footer>
+
+        <LegalFooter />
+
         {flashMessageText && (
           <FlashMessage
             message={flashMessageText}
             onComplete={() => setFlashMessageText(null)}
+            isMuted={isMuted}
           />
         )}
       </div>

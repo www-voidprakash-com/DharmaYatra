@@ -78,6 +78,7 @@ export interface Player {
   isComputer?: boolean; // New flag for practice mode
   startingSquare?: number; // Custom starting position
   playerClass?: string; // Flavor text for ability/class
+  profilePic?: string; // Base64 or URL string for profile picture
 }
 
 export enum GameStage {

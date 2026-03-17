@@ -19,21 +19,21 @@ const REGION = "asia-southeast1"; // Matches your Firebase config
  */
 exports.generateCommentary = onCall({ region: REGION }, async (request) => {
     const { prompt } = request.data;
-    
+
     if (!prompt) {
         throw new HttpsError('invalid-argument', 'The function must be called with a prompt.');
     }
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-1.5-flash',
             contents: prompt,
             config: {
                 temperature: 0.7,
                 maxOutputTokens: 60, // Keep responses concise for the game
             }
         });
-        
+
         return { text: response.text };
     } catch (error) {
         console.error("Gemini Commentary Error:", error);
@@ -55,13 +55,13 @@ exports.generateSpeech = onCall({ region: REGION }, async (request) => {
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash-preview-tts",
+            model: "gemini-2.0-flash-exp",
             contents: [{ parts: [{ text: text }] }],
             config: {
                 responseModalities: ["AUDIO"], // Modality.AUDIO
                 speechConfig: {
                     voiceConfig: {
-                      prebuiltVoiceConfig: { voiceName: voiceName },
+                        prebuiltVoiceConfig: { voiceName: voiceName },
                     },
                 },
             },

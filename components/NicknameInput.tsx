@@ -10,9 +10,16 @@ const NicknameInput: React.FC<NicknameInputProps> = ({ onSubmit, initialNickname
   const { translate, language, availableLanguages } = useLanguage();
   const [nickname, setNickname] = useState(initialNickname || '');
 
+  // Helper: Title Case
+  const toTitleCase = (str: string) => {
+    return str.replace(/\w\S*/g, (txt) => {
+      return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+    });
+  };
+
   useEffect(() => {
     if (initialNickname) {
-        setNickname(initialNickname);
+      setNickname(initialNickname);
     }
   }, [initialNickname]);
 
@@ -24,7 +31,7 @@ const NicknameInput: React.FC<NicknameInputProps> = ({ onSubmit, initialNickname
       onSubmit(trimmedNickname);
     }
   };
-  
+
   const selectedLanguageFontClass = availableLanguages.find(l => l.code === language)?.fontClass || 'font-noto-sans';
 
   return (
@@ -42,7 +49,7 @@ const NicknameInput: React.FC<NicknameInputProps> = ({ onSubmit, initialNickname
               id="nickname-input"
               type="text"
               value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
+              onChange={(e) => setNickname(toTitleCase(e.target.value))}
               placeholder={translate('nickname_placeholder')}
               required
               className="mt-1 w-full p-3 border border-orange-300 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 bg-white text-lg"
@@ -61,9 +68,9 @@ const NicknameInput: React.FC<NicknameInputProps> = ({ onSubmit, initialNickname
           </button>
         </form>
       </div>
-       <footer className="mt-8 text-center text-xs text-stone-500">
-          <p>&copy; {new Date().getFullYear()} DharmaYatra Team. Inspired by ancient wisdom.</p>
-        </footer>
+      <footer className="mt-8 text-center text-xs text-stone-500">
+        <p>&copy; {new Date().getFullYear()} DharmaYatra Team. Inspired by ancient wisdom.</p>
+      </footer>
     </div>
   );
 };

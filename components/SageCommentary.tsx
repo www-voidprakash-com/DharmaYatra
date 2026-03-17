@@ -9,24 +9,35 @@ interface SageCommentaryProps {
   isSpeaking?: boolean;
   onStop?: () => void;
   onReplay?: () => void;
+  onDismiss?: () => void;
+  quotaExceeded?: boolean;
 }
 
-const SageCommentary: React.FC<SageCommentaryProps> = ({ text, isLoading, isSpeaking = false, onStop, onReplay }) => {
+const SageCommentary: React.FC<SageCommentaryProps> = ({ text, isLoading, isSpeaking = false, onStop, onReplay, onDismiss, quotaExceeded }) => {
+  if (quotaExceeded && !text) {
+    // Small persistent offline indicator if no text is shown yet
+    return (
+      <div className="bg-stone-100 border border-stone-300 text-stone-500 p-2 rounded-lg text-xs text-center flex items-center justify-center gap-2 shadow-sm">
+        <span>📡</span> Sage is meditating (Offline Mode)
+      </div>
+    );
+  }
+
   if (!text && !isLoading) return null;
 
   const handleClick = () => {
-      if (isSpeaking && onStop) {
-          onStop();
-      } else if (!isSpeaking && !isLoading && onReplay) {
-          onReplay();
-      }
+    if (isSpeaking && onStop) {
+      onStop();
+    } else if (!isSpeaking && !isLoading && onReplay) {
+      onReplay();
+    }
   };
 
   const isInteractive = isSpeaking || (!isLoading && text);
   const cursorClass = isInteractive ? 'cursor-pointer hover:bg-orange-50/80 ring-2 ring-orange-200' : '';
 
   return (
-    <div 
+    <div
       onClick={isInteractive ? handleClick : undefined}
       className={`relative overflow-hidden rounded-xl border border-yellow-500/30 bg-gradient-to-r from-yellow-50 via-amber-50 to-yellow-50 p-4 shadow-lg transition-all duration-500 ${cursorClass}`}
       title={isSpeaking ? "Click to stop voice" : "Click to replay voice"}
@@ -34,41 +45,59 @@ const SageCommentary: React.FC<SageCommentaryProps> = ({ text, isLoading, isSpea
       <div className="absolute top-0 right-0 p-2 opacity-10">
         <GiScrollQuill className="text-6xl text-amber-800" />
       </div>
-      
+
       <div className="flex items-start gap-3 relative z-10">
         <div className="mt-1 flex-shrink-0 relative">
-             <div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center border border-orange-200 shadow-inner">
-                <span className="text-lg">🧘</span>
-             </div>
-             {isSpeaking && (
-                <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow border border-orange-100">
-                    <FaVolumeUp className="text-orange-600 text-[0.6rem] animate-pulse" />
-                </div>
-             )}
-             {!isSpeaking && !isLoading && text && (
-                 <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow border border-orange-100">
-                    <FaRedoAlt className="text-orange-600 text-[0.6rem]" />
-                 </div>
-             )}
+          <div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center border border-orange-200 shadow-inner">
+            <span className="text-lg">🧘</span>
+          </div>
+          {isSpeaking && (
+            <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow border border-orange-100">
+              <FaVolumeUp className="text-orange-600 text-[0.6rem] animate-pulse" />
+            </div>
+          )}
+          {!isSpeaking && !isLoading && text && (
+            <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow border border-orange-100">
+              <FaRedoAlt className="text-orange-600 text-[0.6rem]" />
+            </div>
+          )}
         </div>
-        
+
         <div className="flex-1">
           <div className="flex items-center justify-between mb-1">
             <h4 className="text-xs font-bold uppercase tracking-wider text-orange-800 flex items-center gap-2">
-               Sage's Wisdom
-               {isSpeaking && (
-                   <span className="text-[0.6rem] bg-orange-200 text-orange-800 px-1 rounded flex items-center">
-                       <FaStop className="mr-1" /> Stop
-                   </span>
-               )}
-               {!isSpeaking && !isLoading && text && (
-                   <span className="text-[0.6rem] bg-orange-100 text-orange-800 px-1 rounded flex items-center opacity-80">
-                       <FaRedoAlt className="mr-1" /> Replay
-                   </span>
-               )}
+              Sage's Wisdom
+              {isSpeaking && (
+                <span className="text-[0.6rem] bg-orange-200 text-orange-800 px-1 rounded flex items-center">
+                  <FaStop className="mr-1" /> Stop
+                </span>
+              )}
+              {!isSpeaking && !isLoading && text && (
+                <div className="flex gap-1">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onReplay && onReplay(); }}
+                    className="text-[0.6rem] bg-orange-100 hover:bg-orange-200 text-orange-800 px-2 py-0.5 rounded flex items-center transition-colors"
+                  >
+                    <FaRedoAlt className="mr-1" /> Replay
+                  </button>
+                  {onDismiss && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+                      className="text-[0.6rem] bg-stone-100 hover:bg-stone-200 text-stone-600 px-2 py-0.5 rounded flex items-center transition-colors border border-stone-200"
+                    >
+                      <span className="mr-1">✕</span> Dismiss
+                    </button>
+                  )}
+                </div>
+              )}
+              {quotaExceeded && (
+                <span className="text-[0.6rem] bg-stone-200 text-stone-600 px-1 rounded flex items-center ml-2 border border-stone-300" title="AI Quota limit reached. Using offline fallback.">
+                  ⚠️ Offline
+                </span>
+              )}
             </h4>
           </div>
-          
+
           {isLoading ? (
             <div className="flex items-center space-x-1 h-5">
               <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
@@ -82,7 +111,7 @@ const SageCommentary: React.FC<SageCommentaryProps> = ({ text, isLoading, isSpea
           )}
         </div>
       </div>
-      
+
       {/* Decorative corners */}
       <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-orange-400/50"></div>
       <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-orange-400/50"></div>

@@ -15,16 +15,18 @@ interface AllPlayersData {
 
 interface GameStateSyncProps {
   onUpdate: (playersData: AllPlayersData) => void;
+  roomId: string; // Mandatory now
 }
 
-const GameStateSync: React.FC<GameStateSyncProps> = ({ onUpdate }) => {
+const GameStateSync: React.FC<GameStateSyncProps> = ({ onUpdate, roomId }) => {
   useEffect(() => {
-    if (!db) {
-      console.warn("Firebase DB not initialized. GameStateSync will not function.");
+    if (!db || !roomId) {
+      console.warn("Firebase DB not initialized or roomId missing.");
       return;
     }
 
-    const gamePlayersRef = ref(db, 'game/players');
+    // Phase 1 stability: Scope to room
+    const gamePlayersRef = ref(db, `rooms/${roomId}/players`);
     const unsubscribe: Unsubscribe = onValue(gamePlayersRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {

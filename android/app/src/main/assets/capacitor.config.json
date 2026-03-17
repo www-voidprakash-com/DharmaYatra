@@ -1,0 +1,9 @@
+{
+  "appId": "com.dharmayatra.game",
+  "appName": "DharmaYatra",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "server": {
+    "cleartext": true
+  }
+}
