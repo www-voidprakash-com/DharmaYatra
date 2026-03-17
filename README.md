@@ -1,75 +1,57 @@
-# 🎲 Bharatiya Snakes & Ladders
+# 🎲 DharmaYatra 101
 
-A real-time multiplayer game built using React + Firebase. Designed with a playful Indian theme, this project demonstrates Web App development, state sync, user inputs, and hosting.
+A real-time, AI-powered educational game inspired by Hindu philosophy (Snakes & Ladders), built using **React + Firebase + Google Gemini**.
+
+---
+
+## ✨ Features
+- 📜 **AI Sage Commentary:** Real-time narration and philosophical insights by a mystical AI Sage (Google Gemini).
+- 🎙️ **Cosmic TTS:** Multimodal speech generation for the Sage's wisdom.
+- 🎨 **SVG-Based Board:** High-fidelity, mathematically rendered board with dynamic snakes and golden ladders.
+- 🌍 **Multilingual:** Support for English, Hindi, and Sanskrit.
+- 🏆 **Live Leaderboard:** Real-time player synchronization via Firebase.
+- 🛡️ **VoidPrakash Legal Footer:** Built-in disclaimers and copyright information.
 
 ---
 
 ## 🔧 Tech Stack
-- React + Vite (Frontend)
-- Firebase Realtime Database (Sync)
-- Firebase Hosting (Deploy)
+- **Frontend:** React + Vite + Tailwind CSS
+- **AI Engine:** Google Gemini (via Cloud Functions & Direct Client Fallback)
+- **Database/Backend:** Firebase Real-time Database & Cloud Functions
+- **Audio:** Howler.js for atmospheric soundscapes
 
 ---
 
 ## 🚀 How to Run Locally
 
-### 1. Clone the repo
-```bash
-git clone https://github.com/yourusername/bharatiya-snakes-ladders.git
-cd bharatiya-snakes-ladders
-```
+1. **Clone the repo**
+   ```bash
+   git clone https://github.com/www-voidprakash-com/DharmaYatra.git
+   cd DharmaYatra
+   ```
 
-### 2. Install dependencies
-```bash
-npm install
-```
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-### 3. Configure Firebase
-Create a `firebase.js` file:
-```js
-import { initializeApp } from 'firebase/app';
-import { getDatabase } from 'firebase/database';
+3. **Configure Environment**
+   Create a `.env.local` file and add your Gemini API Key:
+   ```bash
+   VITE_GEMINI_API_KEY=your_api_key_here
+   ```
 
-const firebaseConfig = { /* Paste your config here */ };
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-export { db };
-```
-
-### 4. Start dev server
-```bash
-npm run dev
-```
-
----
-
-## 🌍 Deploying to Firebase Hosting
-```bash
-npm run build
-firebase deploy
-```
-
----
-
-## ✅ Features Implemented
-- 🎯 Nickname Login
-- 🧠 Real-time Player Sync
-- 🎲 Dice with Animation
-- 🏆 Live Leaderboard
-- 🔥 Firebase Integration
-- 🌐 Web Hosting
-
----
-
-## 👩‍💻 Contributions
-Made by Ashmika Agarwal using Google AI Studio + Custom React Code with real-time collaboration and VoidPrakash.
+4. **Start Dev Server**
+   ```bash
+   npm run dev
+   ```
 
 ---
 
 ## 📜 License
-MIT (feel free to fork and use!)
+MIT (c) 2026 VoidPrakash. See [LICENSE](./LICENSE) for details.
 
 ---
 
-## 📸 Screenshots
-*(add screenshots of board, dice roll, leaderboard, nickname UI)*
+## 👩‍💻 Conceived and Crafted by
+**VoidPrakash** - Transforming ancient wisdom into digital journeys.
