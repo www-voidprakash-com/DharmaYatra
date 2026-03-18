@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import { Player, TurnHistoryEntry, Language } from '../types';
+import { getPanchVediMessage, resolveMomentFeel } from '../data/panchvedi_messages';
 
 interface UseSageCommentaryProps {
     language: Language;
@@ -155,15 +156,46 @@ export const useSageCommentary = ({ language, translate, sageVoice, playAudio, s
         const playerColor = translate(player.color.nameKey);
         const playerAnimal = translate(player.animalIcon.nameKey);
 
+        // Resolve moment-feel from session state
+        const momentFeel = resolveMomentFeel({
+            consecutiveWins: player.consecutiveWins,
+            isFirstTurn: (player.diceThrows || 0) <= 1,
+            hourOfDay: new Date().getHours(),
+        });
+
+        // Get PanchVedi Tier 1 seed message as stylistic reference for the AI
+        const animalKey = player.animalIcon.nameKey.replace('animal_', '');
+        const colorKey = player.color.nameKey.replace('color_', '');
+        const baseEventType = eventType.includes('snake') ? 'snake' : eventType.includes('ladder') ? 'ladder' : eventType as any;
+        const panchVediSeed = getPanchVediMessage({
+            boxName: squareName,
+            eventType: baseEventType,
+            playerName: player.name,
+            playerAnimal: animalKey,
+            playerColor: colorKey,
+            playerAnimalName: playerAnimal,
+            playerColorName: playerColor,
+            momentFeel,
+            square: squareId,
+        });
+
+        const panchVediContext = panchVediSeed
+            ? `\n            PanchVedi Reference Line (brief seed message — DO NOT repeat this, but let its spirit inform your style): "${panchVediSeed}"`
+            : '';
+
+        const momentFeelNote = momentFeel !== 'any'
+            ? `\n            Current World Energy (moment-feel): ${momentFeel.replace(/_/g, ' ')} — adjust your tone to match.`
+            : '';
+
         const prompt = `
             You are a ${persona.role} narrating 'DharmaYatra' (Snakes & Ladders).
             Event Details: Player "${player.name}" has landed on Square ${squareId} (${squareName}). 
-            Player Identity: Color is ${playerColor} (symbolizing the player's current aura/guiding energy) and their vehicle is the ${playerAnimal} (representing their innate temperament).
+            Player Identity: Color is ${playerColor} (their aura/guiding energy) and their spirit vehicle (wahana) is the ${playerAnimal} (representing their innate temperament).
             Spiritual Lesson of Square: "${slDescription}".
-            Game Event: ${eventType.toUpperCase()}${extraTurnNote}.
+            Game Event: ${eventType.toUpperCase()}${extraTurnNote}.${momentFeelNote}${panchVediContext}
             Language: ${language}.
             
-            Instruction: Write a profound 2-sentence commentary. You MUST treat the Player's Color and Animal as metaphors. Relate the ${playerColor} energy and the ${playerAnimal}'s natural spirit to how they handled the ${slDescription} on this square. If it's a Virtue (Ladder), how did their spirit help them climb? If it's a Vice (Snake), how did their essence falter or what must they learn? Be deep, wise, and paced. Max 40 words.
+            Instruction: Write a profound 2-sentence commentary. You MUST weave the ${playerColor} aura and the ${playerAnimal}'s nature as metaphors. If it's a Virtue (Ladder), how did their ${playerAnimal} spirit help them ascend? If it's a Vice (Snake), what did their ${playerColor} energy cloud — and what must they learn? Be poetic, original, and never repeat the reference line. Max 45 words.
         `;
 
         try {

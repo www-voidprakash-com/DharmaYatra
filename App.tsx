@@ -242,6 +242,15 @@ const App = (): React.ReactElement => {
     });
   }, []);
 
+  // Log Sage wisdom to game log whenever it is updated
+  useEffect(() => {
+    if (sageWisdom && gameStage === GameStage.Playing) {
+      const wisdomMsg = translate('msg_sage_wisdom_log', { wisdom: sageWisdom });
+      addMessageToHistory(wisdomMsg);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sageWisdom]);
+
   const handleBackgroundUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {

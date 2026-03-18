@@ -1,16 +1,21 @@
 # 🎲 DharmaYatra 101
+### *A Game. A Journey. A Mirror.*
 
-A real-time, AI-powered educational game inspired by Hindu philosophy (Snakes & Ladders), built using **React + Firebase + Google Gemini**.
+> Not every move is random. Some are reflections waiting to be noticed.
+
+A reimagined Snakes & Ladders experience built by **VoidPrakash** — where every square carries meaning, every move triggers reflection, and the journey responds to you.
+
+**Powered by PanchVedi** — the conscious engine within DharmaYatra. *Not a mascot. An emergent intelligence.*
 
 ---
 
 ## ✨ Features
-- 📜 **AI Sage Commentary:** Real-time narration and philosophical insights by a mystical AI Sage (Google Gemini).
-- 🎙️ **Cosmic TTS:** Multimodal speech generation for the Sage's wisdom.
-- 🎨 **SVG-Based Board:** High-fidelity, mathematically rendered board with dynamic snakes and golden ladders.
-- 🌍 **Multilingual:** Support for English, Hindi, and Sanskrit.
-- 🏆 **Live Leaderboard:** Real-time player synchronization via Firebase.
-- 🛡️ **VoidPrakash Legal Footer:** Built-in disclaimers and copyright information.
+- 🧘 **PanchVedi · AI Sage Commentary:** Real-time philosophical narration powered by Google Gemini — woven from your chosen animal (wahana) and color (aura).
+- 🎙️ **Cosmic TTS:** Multimodal AI voice for the Sage's wisdom.
+- 🎨 **SVG-Based Board:** High-fidelity board with animated snakes and golden ladders.
+- 🌍 **Multilingual:** English, Hindi, Sanskrit, and 7 more regional languages.
+- 🏆 **Live Multiplayer:** Real-time Firebase-powered rooms for up to 4 players.
+- 📱 **Android Coming Soon:** Full Play Store release in progress.
 
 ---
 

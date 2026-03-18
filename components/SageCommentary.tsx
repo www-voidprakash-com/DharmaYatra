@@ -66,7 +66,9 @@ const SageCommentary: React.FC<SageCommentaryProps> = ({ text, isLoading, isSpea
         <div className="flex-1">
           <div className="flex items-center justify-between mb-1">
             <h4 className="text-xs font-bold uppercase tracking-wider text-orange-800 flex items-center gap-2">
-              Sage's Wisdom
+              <span>PanchVedi</span>
+              <span className="text-orange-300/50">·</span>
+              <span>Sage&apos;s Wisdom</span>
               {isSpeaking && (
                 <span className="text-[0.6rem] bg-orange-200 text-orange-800 px-1 rounded flex items-center">
                   <FaStop className="mr-1" /> Stop

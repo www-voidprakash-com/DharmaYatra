@@ -1,0 +1,157 @@
+PanchVedi Dynamic Messaging EngineProduct Requirements Document (Version 1.1)
+Adds architecture and flow for the rollout-ready conscious gameboard experience.
+1. Objective
+Design a dynamic, personalized in-game messaging system for the Snakes & Ladders experience using PanchVedi as the guide. The engine should combine player selections, board events, and broader moment-feel context to produce messages that feel reflective, fun, culturally rooted, and lightly witty without becoming offensive or overly deterministic.
+2. Product Vision
+Dimension
+Intent
+Hyper-personal play
+Use player name, animal, color, DOB-derived traits, and box meaning to make each turn feel tailored.
+Conscious gameboard
+Turn each landing event into a tiny mirror of mood, choice, and environment.
+Fun + reflection
+Blend wisdom, curiosity, and gentle sarcasm so the experience stays playful.
+Safe upliftment
+Avoid harmful targeting or harsh judgment; reframe toward insight and encouragement.
+3. Core Inputs
+3.1 Player-specific inputs
+Name — used for direct, personal address in the popup message.
+Animal archetype — symbolic flavor layer such as Tiger, Owl, Elephant, Monkey, Turtle, or Peacock.
+Color choice — emotional tone layer such as Red (boldness), Blue (calm), Green (growth), Yellow (curiosity), Purple (transformation), or White (clarity).
+DOB — retained for future numerology or life-path enrichment; optional in rollout version.
+Optional mood toggle — manual or inferred mood tag for later versions.
+3.2 Game-specific inputs
+Box number — numeric position where the player lands.
+Box property — semantic type of the square, such as Karma, Ego, Gratitude, Discipline, Wisdom, Temptation, Luck, Duality, Challenge, or Breakthrough.
+Event type — neutral / ladder / snake / bonus / penalty.
+3.3 Context inputs
+Moment feel — broad contextual mood, not literal clock time.
+Environment / location tone — optional setting flavor such as festival, quiet day, crowded city, or calm evening.
+Social mood / trend signal — optional high-level world context for future versions.
+4. Architecture Overview
+The engine sits between the board event and the message popup. It receives player context, box context, and moment-feel context, applies dictionary lookups and tone guardrails, then sends the final line to the UI layer along with any PanchVedi reaction or tooltip state.
+Figure 1. Simplified system architecture for the PanchVedi messaging engine.
+5. Runtime Flow
+At runtime, the system should generate a message only after the landing event is finalized. The first release should prefer fast lookups and simple fusion rules over complex inference so that gameplay remains responsive.
+Figure 2. Message-generation flow from landing event to on-screen popup.
+6. Box Property Matrix
+Property
+Positive Tone
+Shadow
+Message Direction
+Karma
+Balance
+Consequence
+Action meets echo.
+Ego
+Identity
+Pride
+Pause before performance.
+Gratitude
+Humility
+Entitlement
+Recognize what remains.
+Discipline
+Structure
+Rigidity
+Steady is sacred.
+Wisdom
+Awareness
+Arrogance
+Learn, then soften.
+Temptation
+Desire
+Impulse
+Want wisely.
+Luck
+Surprise
+Dependence
+Flow, do not chase.
+Duality
+Contrast
+Conflict
+Opposites are teachers.
+Challenge
+Growth
+Fear
+Rise or retreat?
+Breakthrough
+Realization
+Shock
+Something clicks.
+7. Archetype Dictionary
+Layer
+Option
+Usage hint
+Animal
+Tiger
+Fierce energy; action and urgency.
+Animal
+Owl
+Vision; quiet seeing and discernment.
+Animal
+Elephant
+Grounded memory; patience and grace.
+Animal
+Monkey
+Quick wit; playful instability.
+Animal
+Turtle
+Slow resilience; depth and steadiness.
+Animal
+Peacock
+Confidence; beauty and self-display.
+Color
+Red
+Boldness; heat, passion, assertion.
+Color
+Blue
+Calm; clarity and restraint.
+Color
+Green
+Growth; openness and renewal.
+Color
+Yellow
+Joy; curiosity and brightness.
+Color
+Purple
+Mystery; transformation and self-discovery.
+Color
+White
+Clarity; reset and renewal.
+8. Moment-feel Labels
+Collective Exhaustion: Everyone feels a little worn out; softer, reassuring lines fit best.
+Social Noise: Debates, drama, or overstimulation dominate; messages should encourage pause.
+Quiet Clarity: Calm window for insight; quieter, cleaner messages work well.
+Inner Conflict: The player may feel torn; messages can validate tension without dramatizing it.
+Curious Uncertainty: Open-minded but slightly unsettled; good for reflective nudges.
+Festival Flow: Light, joyful, socially open energy; keep tone playful and bright.
+9. Message Logic (Rollout Version)
+Step 1 — resolve box property from the square landed on.
+Step 2 — read the selected player layers (name, animal, color, optional DOB-derived trait).
+Step 3 — resolve moment feel from environment context or the app’s current mode.
+Step 4 — choose a message template by box property, then enrich it with animal/color flavor and the player name.
+Step 5 — pass the line through tone guardrails so it remains witty, warm, and non-harmful.
+Step 6 — send the final string to the popup component and optionally trigger a PanchVedi reaction.
+10. Tone Guardrails
+Do use mild sarcasm when it feels playful and non-targeting.
+Do keep PanchVedi wise, calm, and lightly cheeky rather than harsh.
+Do prefer encouragement and reframing over criticism.
+Do not generate insulting, shaming, or sensitive-personalized claims.
+Do not overstate astrology, numerology, or environment data as fixed truth.
+Do keep messages short enough for a mobile popup and readable in one glance.
+11. Sample Output
+“Ashmika, even a Tiger can roar too loud in the chaos. This Ego square is asking for a whisper, not a war cry.”
+“Temptation glitters, Ashmika. But the Peacock inside you already shines. Choose curiosity, not craving.”
+“Ashmika, the Owl sees beyond. In this quiet clarity, your Breakthrough arrives not with a bang, but with truth.”
+12. Success Metrics
+Popup acceptance: players do not dismiss the message as irrelevant or repetitive.
+Session delight: messages increase curiosity and emotional attachment to PanchVedi.
+Replay value: variation is high enough that repeat players still find the system fresh.
+Safety: no offensive or unsettling messages are generated in common play paths.
+13. Future Enhancements
+Lottie-based PanchVedi reactions tied to message tone.
+Deeper numerology / kundali enrichment with explicit opt-in.
+More nuanced moment-feel mapping using location, calendar, and festival context.
+A/B testing of message lengths, sarcasm intensity, and archetype weighting.
+Localized Hindi and bilingual runtime messaging packs.
