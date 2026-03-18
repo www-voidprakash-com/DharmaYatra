@@ -84,7 +84,7 @@ export const useSageCommentary = ({ language, translate, sageVoice, playAudio, s
             }
 
             // Fallback: Direct Client-Side Gemini Multimodal (Multispeech)
-            const apiKey = customApiKey || (process.env as any).GEMINI_API_KEY || (process.env as any).API_KEY;
+            const apiKey = customApiKey || ((import.meta as any).env && (import.meta as any).env.VITE_GEMINI_API_KEY) || ((import.meta as any).env && (import.meta as any).env.VITE_API_KEY);
             if (apiKey) {
                 const { GoogleGenAI } = await import("@google/genai");
                 const ai = new GoogleGenAI({ apiKey });
