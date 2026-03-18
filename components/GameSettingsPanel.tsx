@@ -138,13 +138,7 @@ const GameSettingsPanel: React.FC<GameSettingsPanelProps> = ({
                 {/* Advanced / Account Actions */}
                 <div className="pt-2 border-t border-dashed border-orange-200">
                     <div className="flex justify-between items-center">
-                        <button
-                            onClick={onResetNickname}
-                            className="text-[0.7rem] text-orange-600 hover:text-orange-800 font-bold underline hover:no-underline transition-all"
-                            title={translate('change_nickname_button')}
-                        >
-                            Change Nickname
-                        </button>
+                        <div></div> {/* Placeholder to keep layout spacing if needed, or remove completely if flex-end is better */}
 
                         <button
                             onClick={() => setIsAiSettingsOpen(!isAiSettingsOpen)}
