@@ -185,7 +185,7 @@ const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, userNickname, us
 
   return (
     <div 
-      className={`min-h-screen flex flex-col items-center p-4 bg-cover bg-center bg-fixed text-stone-700 ${selectedLanguageFontClass}`} 
+      className={`min-h-screen flex flex-col items-center p-4 bg-repeat bg-auto text-stone-700 ${selectedLanguageFontClass}`} 
       style={{ backgroundImage: "url('/dharmayatra_bg.png')" }}
     >
       <div className="bg-white/90 backdrop-blur-md p-6 sm:p-8 rounded-xl shadow-2xl border border-orange-200 w-full max-w-4xl my-auto">

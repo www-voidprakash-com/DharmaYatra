@@ -1086,7 +1086,7 @@ const App = (): React.ReactElement => {
         />
       )}
       <div
-        className={`game-wrapper min-h-screen bg-cover bg-center bg-fixed bg-no-repeat text-stone-700`}
+        className={`game-wrapper min-h-screen bg-repeat bg-auto text-stone-700`}
         style={{ backgroundImage: customBackground ? `url(${customBackground})` : "url('/dharmayatra_bg.png')" }}
       >
         <header className="mb-6 text-center pt-4">
