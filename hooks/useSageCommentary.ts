@@ -130,7 +130,8 @@ export const useSageCommentary = ({ language, translate, sageVoice, playAudio, s
         squareId: number,
         eventType: 'snake' | 'ladder' | 'win' | 'start' | 'extra' | 'snake_extra' | 'ladder_extra',
         squareName: string,
-        rawSLKey?: string
+        rawSLKey?: string,
+        turnMessage?: string
     ) => {
         let fallbackKey = eventType;
         if (eventType === 'snake_extra') fallbackKey = 'snake';
@@ -138,7 +139,9 @@ export const useSageCommentary = ({ language, translate, sageVoice, playAudio, s
         if (eventType === 'start') fallbackKey = 'ladder';
 
         if (aiQuotaExceeded) {
-            setSageWisdom(translate(`sage_fallback_${fallbackKey}`, { playerName: player.name }));
+            const fallbackStr = turnMessage || translate(`sage_fallback_${fallbackKey}`, { playerName: player.name });
+            setSageWisdom(fallbackStr);
+            generateAndPlayCosmicSpeech(fallbackStr);
             return;
         }
 
@@ -196,7 +199,7 @@ export const useSageCommentary = ({ language, translate, sageVoice, playAudio, s
             Game Event: ${eventType.toUpperCase()}${extraTurnNote}.${momentFeelNote}${panchVediContext}
             Language: ${language}.
             
-            Instruction: Write a profound 2-sentence commentary. You MUST weave the ${playerColor} aura and the ${playerAnimal}'s nature as metaphors. If it's a Virtue (Ladder), how did their ${playerAnimal} spirit help them ascend? If it's a Vice (Snake), what did their ${playerColor} energy cloud — and what must they learn? Be poetic, original, and never repeat the reference line. Max 45 words.
+            Instruction: Write a profound 2-sentence commentary about this event. You MUST weave the ${playerColor} aura and the ${playerAnimal}'s nature as metaphors. The game just announced this to the player: "${turnMessage}". Use the spirit of that announcement to inform your commentary. If it's a Virtue (Ladder), how did their ${playerAnimal} spirit help them ascend? If it's a Vice (Snake), what did their ${playerColor} energy cloud — and what must they learn? Be poetic, original, and never repeat the reference line. Max 45 words.
         `;
 
         try {
@@ -240,7 +243,9 @@ export const useSageCommentary = ({ language, translate, sageVoice, playAudio, s
         } catch (error: any) {
             console.warn("All AI Commentary methods failed.", error);
             if (isQuotaError(error)) setAiQuotaExceeded(true);
-            setSageWisdom(translate(`sage_fallback_${fallbackKey}`, { playerName: player.name }));
+            const fallbackStr = turnMessage || translate(`sage_fallback_${fallbackKey}`, { playerName: player.name });
+            setSageWisdom(fallbackStr);
+            generateAndPlayCosmicSpeech(fallbackStr);
         } finally {
             setIsSageThinking(false);
         }

@@ -1,0 +1,79 @@
+.cr-scene {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  animation-duration: 6s;
+  animation-fill-mode: forwards;
+  animation-timing-function: linear;
+}
+
+.cr-scene img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.6);
+  animation-duration: 6s;
+  animation-fill-mode: forwards;
+  animation-timing-function: ease-in-out;
+}
+
+.cr-text-box {
+  position: absolute;
+  top: 60%;
+  left: 10%;
+  right: 10%;
+  text-align: center;
+  color: #FFF;
+  text-shadow: 0 4px 20px rgba(0,0,0,0.9), 0 0 10px rgba(255, 140, 0, 0.5);
+  z-index: 10;
+  opacity: 0;
+  animation-duration: 6s;
+  animation-fill-mode: forwards;
+  animation-timing-function: ease-in-out;
+}
+
+.cr-text-box.top-40 {
+  top: 40%;
+}
+
+@keyframes fadeInOut_cr { 0% { opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes textFadeInOut_cr { 0% { opacity: 0; transform: translateY(50px); } 15% { opacity: 1; transform: translateY(0); } 85% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-30px); } }
+@keyframes scaleUp_cr { 0% { transform: scale(1.0); } 100% { transform: scale(1.1); } }
+@keyframes scaleDown_cr { 0% { transform: scale(1.1); } 100% { transform: scale(1.0); } }
+@keyframes panRight_cr { 0% { transform: scale(1.1) translateX(-5%); } 100% { transform: scale(1.1) translateX(5%); } }
+@keyframes panLeft_cr { 0% { transform: scale(1.1) translateX(5%); } 100% { transform: scale(1.1) translateX(-5%); } }
+
+.cr-scene.nth-1 { animation-name: fadeInOut_cr; animation-delay: 0s; }
+.cr-scene.nth-1 img { animation-name: scaleUp_cr; animation-delay: 0s; }
+.cr-scene.nth-1 .cr-text-box { animation-name: textFadeInOut_cr; animation-delay: 0.5s; }
+
+.cr-scene.nth-2 { animation-name: fadeInOut_cr; animation-delay: 6s; }
+.cr-scene.nth-2 img { animation-name: panRight_cr; animation-delay: 6s; }
+.cr-scene.nth-2 .cr-text-box { animation-name: textFadeInOut_cr; animation-delay: 6.5s; }
+
+.cr-scene.nth-3 { animation-name: fadeInOut_cr; animation-delay: 12s; }
+.cr-scene.nth-3 img { animation-name: scaleDown_cr; animation-delay: 12s; }
+.cr-scene.nth-3 .cr-text-box { animation-name: textFadeInOut_cr; animation-delay: 12.5s; }
+
+.cr-scene.nth-4 { animation-name: fadeInOut_cr; animation-delay: 18s; }
+.cr-scene.nth-4 img { animation-name: panLeft_cr; animation-delay: 18s; }
+.cr-scene.nth-4 .cr-text-box { animation-name: textFadeInOut_cr; animation-delay: 18.5s; }
+
+.cr-scene.nth-5 { animation-name: fadeInOut_cr; animation-delay: 24s; }
+.cr-scene.nth-5 img { animation-name: scaleUp_cr; animation-delay: 24s; }
+.cr-scene.nth-5 .cr-text-box { animation-name: textFadeInOut_cr; animation-delay: 24.5s; }
+
+.cr-scene.nth-6 { animation-name: fadeInOut_cr; animation-delay: 30s; }
+.cr-scene.nth-6 img { animation-name: panRight_cr; animation-delay: 30s; }
+.cr-scene.nth-6 .cr-text-box { animation-name: textFadeInOut_cr; animation-delay: 30.5s; }
+
+@keyframes finalFadeIn_cr { 0% { opacity: 0; } 10% { opacity: 1; } 100% { opacity: 1; } }
+@keyframes finalScale_cr { 0% { transform: scale(1.1); } 100% { transform: scale(1.0); } }
+@keyframes finalTextIn_cr { 0% { opacity: 0; transform: translateY(50px); } 100% { opacity: 1; transform: translateY(0); } }
+
+.cr-scene.nth-7 { animation-name: finalFadeIn_cr; animation-delay: 36s; opacity: 0; animation-duration: 6s; animation-fill-mode: forwards; }
+.cr-scene.nth-7 img { animation-name: finalScale_cr; animation-delay: 36s; animation-duration: 6s; }
+.cr-scene.nth-7 .final-text-in { animation-name: finalTextIn_cr; animation-delay: 37s; opacity: 0; animation-duration: 1.5s; animation-fill-mode: forwards; }

@@ -10,6 +10,8 @@ import { FaLanguage, FaRobot, FaChevronDown, FaChevronUp, FaCogs } from 'react-i
 interface PlayerSetupProps {
   onStartGame: (players: Player[]) => void;
   userNickname: string | null;
+  userApiKey: string | null;
+  onApiKeyChange: (key: string | null) => void;
 }
 
 interface PlayerConfig {
@@ -29,7 +31,7 @@ const CLASS_PRESETS = [
   { id: 'veteran', start: 10 },
 ];
 
-const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, userNickname }) => {
+const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, userNickname, userApiKey, onApiKeyChange }) => {
   const { language, setLanguage, translate, availableLanguages } = useLanguage();
   const [numPlayers, setNumPlayers] = useState<number>(2);
   const [playerConfigs, setPlayerConfigs] = useState<PlayerConfig[]>([]);
@@ -164,7 +166,7 @@ const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, userNickname }) 
     // Create Computer Bot
     const computerPlayer: Player = {
       id: 2,
-      name: 'Panditji', // Renamed bot
+      name: 'Panchvedi', // Renamed bot
       color: AVAILABLE_COLORS[1],
       animalIcon: AVAILABLE_ANIMAL_ICONS[5], // Tiger
       position: PLAYER_INITIAL_POSITION,
@@ -182,7 +184,10 @@ const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, userNickname }) 
   const selectedLanguageFontClass = availableLanguages.find(l => l.code === language)?.fontClass || 'font-noto-sans';
 
   return (
-    <div className={`min - h - screen flex flex - col items - center p - 4 bg - gradient - to - br from - amber - 100 via - orange - 100 to - yellow - 100 text - stone - 700 ${selectedLanguageFontClass} `}>
+    <div 
+      className={`min-h-screen flex flex-col items-center p-4 bg-cover bg-center bg-fixed text-stone-700 ${selectedLanguageFontClass}`} 
+      style={{ backgroundImage: "url('/dharmayatra_bg.png')" }}
+    >
       <div className="bg-white/90 backdrop-blur-md p-6 sm:p-8 rounded-xl shadow-2xl border border-orange-200 w-full max-w-4xl my-auto">
         <h1 className="text-3xl sm:text-4xl font-bold text-orange-600 text-center mb-6 sm:mb-8">
           {translate('setup_title')}
@@ -382,6 +387,41 @@ const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, userNickname }) 
         </div>
 
         <div className="flex flex-col gap-3 mt-4 border-t border-orange-200 pt-6">
+          {/* Advanced AI Setting */}
+          <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-200 mb-2">
+            <h3 className="font-bold text-orange-800 text-sm mb-2">Advance AI Setting</h3>
+            <p className="text-xs text-stone-600 mb-3">For the BEST AI experience, add your custom Gemini API Key here.</p>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                className="flex-1 p-2 border border-orange-300 rounded-lg text-sm bg-white"
+                placeholder="Enter Gemini API Key (Optional)"
+                value={userApiKey || ''}
+                onChange={(e) => onApiKeyChange(e.target.value || null)}
+              />
+              <button 
+                type="button"
+                className="px-4 py-2 bg-orange-200 text-orange-800 hover:bg-orange-300 rounded-lg text-xs font-bold transition-colors whitespace-nowrap"
+                onClick={async () => {
+                  if (!userApiKey) {
+                     alert("Please enter an API key first."); 
+                     return;
+                  }
+                  try {
+                    const { GoogleGenAI } = await import('@google/genai');
+                    const ai = new GoogleGenAI({ apiKey: userApiKey });
+                    await (ai.models as any).generateContent({ model: "gemini-1.5-flash", contents: "test", config: { maxOutputTokens: 1 }});
+                    alert("API Key Validated Successfully! You are ready for the best AI experience.");
+                  } catch (e: any) {
+                    alert("Invalid or Unauthorized API Key!\n\n" + e.message);
+                  }
+                }}
+              >
+                Validate Key
+              </button>
+            </div>
+          </div>
+
           <button
             onClick={handleSubmit}
             className="w-full px-6 py-4 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold rounded-xl shadow-lg transition-all duration-150 text-xl transform hover:-translate-y-0.5"

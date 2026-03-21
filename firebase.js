@@ -3,6 +3,7 @@
 import { initializeApp } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
 import { getFunctions } from 'firebase/functions';
+import { getAuth, signInAnonymously } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAVfk_qp5QRBcT8qGk68R8izkWa-gTWfEE",
@@ -18,5 +19,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const functions = getFunctions(app, 'asia-southeast1'); // Matching your DB region
+const auth = getAuth(app);
 
-export { db, functions };
+signInAnonymously(auth)
+  .then(() => {
+    console.log("Anonymous sign-in success");
+  })
+  .catch((error) => {
+    console.error("Anonymous sign-in failed:", error);
+  });
+
+export { db, functions, auth };

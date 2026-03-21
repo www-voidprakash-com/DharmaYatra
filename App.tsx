@@ -10,6 +10,7 @@ import GameControls from './components/GameControls';
 import GameSettingsPanel from './components/GameSettingsPanel';
 import GameMessage from './components/GameMessage';
 import PlayerSetup from './components/PlayerSetup';
+import CinematicIntro from './components/CinematicIntro';
 import WinScreen from './components/WinScreen';
 import HistoryLog from './components/HistoryLog';
 import NicknameInput from './components/NicknameInput';
@@ -85,6 +86,12 @@ const App = (): React.ReactElement => {
   const { isMuted, toggleMute, initAudioContext, playAudio, stopAudio } = useAudioEngine();
   const [language, setLanguageState] = useState<Language>(Language.English);
   const [userNickname, setUserNickname] = useState<string | null>(null);
+  const [showIntro, setShowIntro] = useState<boolean>(() => !sessionStorage.getItem('dy_intro_seen'));
+
+  const handleIntroComplete = useCallback(() => {
+    setShowIntro(false);
+    sessionStorage.setItem('dy_intro_seen', 'true');
+  }, []);
   const [players, setPlayers] = useState<Player[]>([]);
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState<number>(0);
   const [diceValue, setDiceValue] = useState<number | null>(null); // For display only
@@ -445,14 +452,13 @@ const App = (): React.ReactElement => {
     setTurnHistory([]);
     setSageWisdom(null);
     setIsProcessingTurn(false);
-    stopSageAudio(); // Stop audio on reset
-    // lastAudioBase64Ref.current = null; // Handled by hook logic (cleared on new gen)
-    resetSummaryGen(); // Allow summary for next game
-    setAiQuotaExceeded(false); // Reset AI quota state on new game
+    stopSageAudio();
+    resetSummaryGen();
+    setAiQuotaExceeded(false);
     if (userNickname) {
       addMessageToHistory(translate('msg_welcome'));
     }
-  }, [userNickname, translate, addMessageToHistory, setAnimationState, setPlayers, setCurrentPlayerIndex, setDiceValue, setGameMessageKey, setMessageReplacements, setGameStage, setWinners, setMessageHistory, setTurnHistory, stopSageAudio]);
+  }, [userNickname, translate, addMessageToHistory, setGameStage, stopSageAudio]);
 
 
   const startGame = useCallback(async (configuredPlayersSetup: Player[]) => {
@@ -537,6 +543,31 @@ const App = (): React.ReactElement => {
 
   }, [translate, addMessageToHistory, setPlayers, setCurrentPlayerIndex, setDiceValue, setGameStage, setGameMessageKey, setMessageReplacements, addTurnToHistory, db, roomId]);
 
+  const restartWithSamePlayers = useCallback(() => {
+    const cleanedPlayers = players.map(p => ({
+      ...p,
+      position: p.startingSquare || 0,
+      hasStarted: (p.startingSquare || 0) > 0,
+      diceThrows: 0,
+      hasFinished: false,
+      finishRank: null
+    }));
+    
+    setAnimationState(null);
+    setActiveSpecialSquare(null);
+    setWinners([]);
+    setMessageHistory([]);
+    setTurnHistory([]);
+    setSageWisdom(null);
+    setIsProcessingTurn(false);
+    stopSageAudio();
+    resetSummaryGen();
+    setAiQuotaExceeded(false);
+
+    // Re-run start sequence
+    startGame(cleanedPlayers);
+  }, [players, startGame, stopSageAudio, resetSummaryGen]);
+
   const advanceToNextPlayer = useCallback(() => {
     setSageWisdom(null); // Clear wisdom on next turn
     stopSageAudio(); // Stop audio on turn change
@@ -587,9 +618,11 @@ const App = (): React.ReactElement => {
     if (gameStage !== GameStage.Playing || players.length === 0) return;
 
     const activePlayers = players.filter(p => !p.hasFinished);
+    const hasWinner = players.some(p => p.hasFinished);
+    const isPracticeMode = gameMode === 'practice';
 
-    // Check if game should end: either single player finished, or all multiplayer finished
-    if (activePlayers.length === 0) {
+    // Check if game should end: either single player finished, or all multiplayer finished, or practice mode winner
+    if (activePlayers.length === 0 || (isPracticeMode && hasWinner)) {
       setGameStage(GameStage.GameOver);
 
       // Trigger Summary
@@ -771,7 +804,8 @@ const App = (): React.ReactElement => {
         landedOnDiceSquare,
         aiEventType as any, // Cast to allow new composite types
         aiEventDetail || `${finalPos}`,
-        aiRawSLKey
+        aiRawSLKey,
+        messagesToLog.join(" ")
       );
     } else {
       // For normal events where Sage doesn't speak, read the flash message text
@@ -994,6 +1028,10 @@ const App = (): React.ReactElement => {
   // The original `gameSyncComponent` variable is removed, and the component is rendered directly in JSX.
   // The `roomId` prop is already included in the provided `GameStateSync` component.
 
+  if (showIntro) {
+    return <CinematicIntro onComplete={handleIntroComplete} />;
+  }
+
   if (!userNickname) {
     return (
       <LanguageContext.Provider value={languageContextValue}>
@@ -1022,7 +1060,12 @@ const App = (): React.ReactElement => {
           {userNickname && gameMode === 'multiplayer' && (
             <GameStateSync roomId={roomId} onUpdate={handleRemoteGameStateUpdate} />
           )}
-          <PlayerSetup onStartGame={startGame} userNickname={userNickname} />
+          <PlayerSetup 
+            onStartGame={startGame} 
+            userNickname={userNickname}
+            userApiKey={userApiKey}
+            onApiKeyChange={handleApiKeyChange}
+          />
           <LegalFooter />
         </div>
       </LanguageContext.Provider>
@@ -1043,8 +1086,8 @@ const App = (): React.ReactElement => {
         />
       )}
       <div
-        className={`game-wrapper min-h-screen bg-gradient-to-br from-amber-50 via-orange-100 to-amber-100 text-stone-700`}
-        style={customBackground ? { backgroundImage: `url(${customBackground})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : {}}
+        className={`game-wrapper min-h-screen bg-cover bg-center bg-fixed bg-no-repeat text-stone-700`}
+        style={{ backgroundImage: customBackground ? `url(${customBackground})` : "url('/dharmayatra_bg.png')" }}
       >
         <header className="mb-6 text-center pt-4">
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-red-600 drop-shadow-sm tracking-tight bg-white/80 rounded-lg px-4 inline-block backdrop-blur-sm">
@@ -1132,13 +1175,32 @@ const App = (): React.ReactElement => {
               onApiKeyChange={handleApiKeyChange}
             />
 
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <button
+                onClick={restartWithSamePlayers}
+                disabled={animationState !== null || isProcessingTurn}
+                className="w-full p-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl shadow-md transition-colors duration-150 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:opacity-60 disabled:cursor-not-allowed text-sm"
+                title="Restart Match"
+              >
+                <FaRedo size={14} /> Restart
+              </button>
+              <button
+                onClick={resetGame}
+                disabled={animationState !== null || isProcessingTurn}
+                className="w-full p-2.5 bg-stone-500 hover:bg-stone-600 text-white font-bold rounded-xl shadow-md transition-colors duration-150 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-stone-400 disabled:opacity-60 disabled:cursor-not-allowed text-sm whitespace-nowrap"
+                title="Reconfigure Players"
+              >
+                Reconfigure
+              </button>
+            </div>
+            
             <button
-              onClick={resetGame}
+              onClick={() => { window.location.href = '/' }}
               disabled={animationState !== null || isProcessingTurn}
-              className="w-full p-3 mt-4 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md transition-colors duration-150 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:opacity-60 disabled:cursor-not-allowed"
-              title={translate('reset_game')}
+              className="w-full p-2.5 mt-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-md transition-colors duration-150 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-red-400 disabled:opacity-60 disabled:cursor-not-allowed text-sm"
+              title="Exit Game completely"
             >
-              <FaRedo size={18} /> {translate('reset_game')}
+              Exit Game
             </button>
 
           </aside>

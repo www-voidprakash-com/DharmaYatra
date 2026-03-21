@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+/* CSS Reset and Body Setup */
+body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Times New Roman', serif; }
+
+/* The Stage */
+.stage { width: 1080px; height: 1920px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.4); transform-origin: center; background: #000; overflow: hidden; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+
+/* Each Scene */
+.scene { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; animation-duration: 6s; animation-fill-mode: forwards; animation-timing-function: linear; }
+.scene img { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.6); animation-duration: 6s; animation-fill-mode: forwards; animation-timing-function: ease-in-out; }
+
+/* The Text Container */
+.text-box { position: absolute; top: 60%; left: 10%; right: 10%; text-align: center; color: #FFF; text-shadow: 0 4px 20px rgba(0,0,0,0.9), 0 0 10px rgba(255, 140, 0, 0.5); z-index: 10; opacity: 0; animation-duration: 6s; animation-fill-mode: forwards; animation-timing-function: ease-in-out; }
+.text-box h1 { font-size: 80px; font-weight: bold; letter-spacing: 2px; margin-bottom: 30px; font-family: 'Georgia', serif; color: #fdf5e6; }
+.text-box h2 { font-size: 55px; font-weight: normal; line-height: 1.4; color: #f5deb3; margin: 15px 0;}
+
+/* Animations Keyframes */
+@keyframes fadeInOut { 0% { opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes textFadeInOut { 0% { opacity: 0; transform: translateY(50px); } 15% { opacity: 1; transform: translateY(0); } 85% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-30px); } }
+@keyframes scaleUp { 0% { transform: scale(1.0); } 100% { transform: scale(1.1); } }
+@keyframes scaleDown { 0% { transform: scale(1.1); } 100% { transform: scale(1.0); } }
+@keyframes panRight { 0% { transform: scale(1.1) translateX(-5%); } 100% { transform: scale(1.1) translateX(5%); } }
+@keyframes panLeft { 0% { transform: scale(1.1) translateX(5%); } 100% { transform: scale(1.1) translateX(-5%); } }
+
+/* Scene Timings (6 seconds each, 42 seconds total) */
+.scene:nth-child(1) { animation-name: fadeInOut; animation-delay: 0s; }
+.scene:nth-child(1) img { animation-name: scaleUp; animation-delay: 0s; }
+.scene:nth-child(1) .text-box { animation-name: textFadeInOut; animation-delay: 0.5s; top: 40%;}
+
+.scene:nth-child(2) { animation-name: fadeInOut; animation-delay: 6s; }
+.scene:nth-child(2) img { animation-name: panRight; animation-delay: 6s; }
+.scene:nth-child(2) .text-box { animation-name: textFadeInOut; animation-delay: 6.5s; }
+
+.scene:nth-child(3) { animation-name: fadeInOut; animation-delay: 12s; }
+.scene:nth-child(3) img { animation-name: scaleDown; animation-delay: 12s; }
+.scene:nth-child(3) .text-box { animation-name: textFadeInOut; animation-delay: 12.5s; }
+
+.scene:nth-child(4) { animation-name: fadeInOut; animation-delay: 18s; }
+.scene:nth-child(4) img { animation-name: panLeft; animation-delay: 18s; }
+.scene:nth-child(4) .text-box { animation-name: textFadeInOut; animation-delay: 18.5s; }
+
+.scene:nth-child(5) { animation-name: fadeInOut; animation-delay: 24s; }
+.scene:nth-child(5) img { animation-name: scaleUp; animation-delay: 24s; }
+.scene:nth-child(5) .text-box { animation-name: textFadeInOut; animation-delay: 24.5s; }
+
+.scene:nth-child(6) { animation-name: fadeInOut; animation-delay: 30s; }
+.scene:nth-child(6) img { animation-name: panRight; animation-delay: 30s; }
+.scene:nth-child(6) .text-box { animation-name: textFadeInOut; animation-delay: 30.5s; top: 40%;}
+
+/* Final scene holds */
+@keyframes finalFadeIn { 0% { opacity: 0; } 10% { opacity: 1; } 100% { opacity: 1; } }
+@keyframes finalScale { 0% { transform: scale(1.1); } 100% { transform: scale(1.0); } }
+@keyframes finalTextIn { 0% { opacity: 0; transform: translateY(50px); } 100% { opacity: 1; transform: translateY(0); } }
+
+.scene:nth-child(7) { animation-name: finalFadeIn; animation-delay: 36s; opacity: 0; animation-duration: 6s; animation-fill-mode: forwards; }
+.scene:nth-child(7) img { animation-name: finalScale; animation-delay: 36s; animation-duration: 6s; }
+.scene:nth-child(7) .text-box { animation-name: finalTextIn; animation-delay: 37s; opacity: 0; animation-duration: 1.5s; animation-fill-mode: forwards; top: 40%;}
+
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <!-- 1 -->
+  <div class="scene">
+    <img src="file:///C:/Users/ashmi/.gemini/antigravity/brain/d587aa23-c1f6-44f2-b3cd-576002e1eb0c/card_1_title_1774116107487.png" />
+    <div class="text-box">
+      <h2>What if this was never just a game?</h2>
+    </div>
+  </div>
+  <!-- 2 -->
+  <div class="scene">
+    <img src="file:///C:/Users/ashmi/.gemini/antigravity/brain/d587aa23-c1f6-44f2-b3cd-576002e1eb0c/card_2_origin_1774116127004.png" />
+    <div class="text-box">
+      <h2>Centuries ago in India...</h2>
+      <h2>A game called Moksha Patam was created.</h2>
+    </div>
+  </div>
+  <!-- 3 -->
+  <div class="scene">
+    <img src="file:///C:/Users/ashmi/.gemini/antigravity/brain/d587aa23-c1f6-44f2-b3cd-576002e1eb0c/card_3_ladders_1774116142670.png" />
+    <div class="text-box">
+      <h2>Ladders were virtues.</h2>
+    </div>
+  </div>
+  <!-- 4 -->
+  <div class="scene">
+    <img src="file:///C:/Users/ashmi/.gemini/antigravity/brain/d587aa23-c1f6-44f2-b3cd-576002e1eb0c/card_4_snakes_1774116156859.png" />
+    <div class="text-box">
+      <h2>Snakes were vices.</h2>
+      <h2>Every fall carried consequence.</h2>
+    </div>
+  </div>
+  <!-- 5 -->
+  <div class="scene">
+    <img src="file:///C:/Users/ashmi/.gemini/antigravity/brain/d587aa23-c1f6-44f2-b3cd-576002e1eb0c/card_5_transition_1774116173601.png" />
+    <div class="text-box">
+      <h2>It was a map of life, karma, and Moksha.</h2>
+      <h2>Over time, it became a game of chance.</h2>
+    </div>
+  </div>
+  <!-- 6 -->
+  <div class="scene">
+    <img src="file:///C:/Users/ashmi/.gemini/antigravity/brain/d587aa23-c1f6-44f2-b3cd-576002e1eb0c/card_6_reveal_1774116193814.png" />
+    <div class="text-box">
+      <h1>DharmaYatra 101</h1>
+      <h2>Brings the meaning back.</h2>
+    </div>
+  </div>
+  <!-- 7 -->
+  <div class="scene">
+    <img src="file:///C:/Users/ashmi/.gemini/antigravity/brain/d587aa23-c1f6-44f2-b3cd-576002e1eb0c/card_7_closing_1774116209950.png" />
+    <div class="text-box">
+      <h1>Play. Reflect. Repeat.</h1>
+      <h2 style="font-size:40px; margin-top:40px;">DharmaYatra 101 — Rooted in heritage.</h2>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.onload = function() {
+    const vW = window.innerWidth;
+    const vH = window.innerHeight;
+    const scale = Math.min(vW/1080, vH/1920);
+    document.getElementById('stage').style.transform = `translate(-50%, -50%) scale(${scale})`;
+  }
+  
+  // Also handle resize just in case
+  window.onresize = function() {
+    const vW = window.innerWidth;
+    const vH = window.innerHeight;
+    const scale = Math.min(vW/1080, vH/1920);
+    document.getElementById('stage').style.transform = `translate(-50%, -50%) scale(${scale})`;
+  }
+</script>
+</body>
+</html>
