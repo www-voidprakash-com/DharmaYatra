@@ -11,6 +11,7 @@ import GameSettingsPanel from './components/GameSettingsPanel';
 import GameMessage from './components/GameMessage';
 import PlayerSetup from './components/PlayerSetup';
 import CinematicIntro from './components/CinematicIntro';
+import VideoIntro from './components/VideoIntro';
 import WinScreen from './components/WinScreen';
 import HistoryLog from './components/HistoryLog';
 import NicknameInput from './components/NicknameInput';
@@ -518,7 +519,7 @@ const App = (): React.ReactElement => {
 
     setCurrentPlayerIndex(0);
     setDiceValue(null);
-    setGameStage(GameStage.Playing);
+    setGameStage(GameStage.VideoIntro);
     const firstPlayer = initialPlayers[0];
     const startMsgKey = 'msg_game_started';
     const startMsgReplacements = { firstPlayerName: firstPlayer.name };
@@ -1068,6 +1069,14 @@ const App = (): React.ReactElement => {
           />
           <LegalFooter />
         </div>
+      </LanguageContext.Provider>
+    );
+  }
+
+  if (gameStage === GameStage.VideoIntro) {
+    return (
+      <LanguageContext.Provider value={languageContextValue}>
+        <VideoIntro onComplete={() => setGameStage(GameStage.Playing)} />
       </LanguageContext.Provider>
     );
   }

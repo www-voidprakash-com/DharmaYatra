@@ -83,6 +83,7 @@ export interface Player {
 
 export enum GameStage {
   Setup = 'setup',
+  VideoIntro = 'videoIntro',
   Playing = 'playing',
   GameOver = 'gameOver',
 }
