@@ -106,7 +106,7 @@ const App = (): React.ReactElement => {
   const [activeSpecialSquare, setActiveSpecialSquare] = useState<{ id: number; type: 'snake' | 'ladder' } | null>(null);
   const [gameMode, setGameMode] = useState<'multiplayer' | 'practice'>('multiplayer');
   const [isProcessingTurn, setIsProcessingTurn] = useState<boolean>(false);
-  const [customBackground, setCustomBackground] = useState<string | null>(null);
+  const [customBackground, setCustomBackground] = useState<string | null>('/assets/bg-poster.png');
 
   useEffect(() => {
     initializeAdMob();

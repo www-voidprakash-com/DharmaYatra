@@ -1,249 +1,91 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<style>
-/* CSS Reset and Body Setup */
-body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Times New Roman', serif; }
-
-/* The Stage */
-.stage { width: 1080px; height: 1920px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.4); transform-origin: center; background: #000; overflow: hidden; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
-
-/* Each Scene */
-.scene { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; animation-duration: 6s; animation-fill-mode: forwards; animation-timing-function: linear; }
-.scene img { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.6); animation-duration: 6s; animation-fill-mode: forwards; animation-timing-function: ease-in-out; }
-
-/* The Text Container */
-.text-box { position: absolute; top: 60%; left: 10%; right: 10%; text-align: center; color: #FFF; text-shadow: 0 4px 20px rgba(0,0,0,0.9), 0 0 10px rgba(255, 140, 0, 0.5); z-index: 10; opacity: 0; animation-duration: 6s; animation-fill-mode: forwards; animation-timing-function: ease-in-out; }
-.text-box h1 { font-size: 80px; font-weight: bold; letter-spacing: 2px; margin-bottom: 30px; font-family: 'Georgia', serif; color: #fdf5e6; }
-.text-box h2 { font-size: 55px; font-weight: normal; line-height: 1.4; color: #f5deb3; margin: 15px 0;}
-
-/* Animations Keyframes */
-@keyframes fadeInOut { 0% { opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes textFadeInOut { 0% { opacity: 0; transform: translateY(50px); } 15% { opacity: 1; transform: translateY(0); } 85% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-30px); } }
-@keyframes scaleUp { 0% { transform: scale(1.0); } 100% { transform: scale(1.1); } }
-@keyframes scaleDown { 0% { transform: scale(1.1); } 100% { transform: scale(1.0); } }
-@keyframes panRight { 0% { transform: scale(1.1) translateX(-5%); } 100% { transform: scale(1.1) translateX(5%); } }
-@keyframes panLeft { 0% { transform: scale(1.1) translateX(5%); } 100% { transform: scale(1.1) translateX(-5%); } }
-
-/* Scene Timings (6 seconds each, 42 seconds total) */
-.scene:nth-child(1) { animation-name: fadeInOut; animation-delay: 0s; }
-.scene:nth-child(1) img { animation-name: scaleUp; animation-delay: 0s; }
-.scene:nth-child(1) .text-box { animation-name: textFadeInOut; animation-delay: 0.5s; top: 40%;}
-
-.scene:nth-child(2) { animation-name: fadeInOut; animation-delay: 6s; }
-.scene:nth-child(2) img { animation-name: panRight; animation-delay: 6s; }
-.scene:nth-child(2) .text-box { animation-name: textFadeInOut; animation-delay: 6.5s; }
-
-.scene:nth-child(3) { animation-name: fadeInOut; animation-delay: 12s; }
-.scene:nth-child(3) img { animation-name: scaleDown; animation-delay: 12s; }
-.scene:nth-child(3) .text-box { animation-name: textFadeInOut; animation-delay: 12.5s; }
-
-.scene:nth-child(4) { animation-name: fadeInOut; animation-delay: 18s; }
-.scene:nth-child(4) img { animation-name: panLeft; animation-delay: 18s; }
-.scene:nth-child(4) .text-box { animation-name: textFadeInOut; animation-delay: 18.5s; }
-
-.scene:nth-child(5) { animation-name: fadeInOut; animation-delay: 24s; }
-.scene:nth-child(5) img { animation-name: scaleUp; animation-delay: 24s; }
-.scene:nth-child(5) .text-box { animation-name: textFadeInOut; animation-delay: 24.5s; }
-
-.scene:nth-child(6) { animation-name: fadeInOut; animation-delay: 30s; }
-.scene:nth-child(6) img { animation-name: panRight; animation-delay: 30s; }
-.scene:nth-child(6) .text-box { animation-name: textFadeInOut; animation-delay: 30.5s; top: 40%;}
-
-/* Final scene holds */
-@keyframes finalFadeIn { 0% { opacity: 0; } 10% { opacity: 1; } 100% { opacity: 1; } }
-@keyframes finalScale { 0% { transform: scale(1.1); } 100% { transform: scale(1.0); } }
-@keyframes finalTextIn { 0% { opacity: 0; transform: translateY(50px); } 100% { opacity: 1; transform: translateY(0); } }
-
-.scene:nth-child(7) { animation-name: finalFadeIn; animation-delay: 36s; opacity: 0; animation-duration: 6s; animation-fill-mode: forwards; }
-.scene:nth-child(7) img { animation-name: finalScale; animation-delay: 36s; animation-duration: 6s; }
-.scene:nth-child(7) .text-box { animation-name: finalTextIn; animation-delay: 37s; opacity: 0; animation-duration: 1.5s; animation-fill-mode: forwards; top: 40%;}
-
-/* --- NEW CONTROLS & OVERLAY --- */
-.scene, .scene img, .text-box { animation-play-state: paused !important; }
-body.playing .scene, body.playing .scene img, body.playing .text-box { animation-play-state: running !important; }
-
-@keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
-
-.controls { position: absolute; top: 30px; right: 30px; z-index: 9999; display: none; }
-body.playing .controls { display: block; }
-.skip-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 12px 24px; cursor: pointer; border-radius: 30px; font-family: 'Georgia', serif; font-size: 16px; letter-spacing: 1px; transition: 0.3s; backdrop-filter: blur(5px); }
-.skip-btn:hover { background: rgba(255,255,255,0.3); }
-
-.play-game-btn { margin-top: 40px; background: rgba(245, 222, 179, 0.9); border: 2px solid #f5deb3; color: #000; padding: 15px 40px; font-size: 24px; border-radius: 50px; text-decoration: none; display: inline-block; font-family: 'Georgia', serif; font-weight: bold; cursor: pointer; transition: 0.4s; pointer-events: auto; box-shadow: 0 0 20px rgba(245,222,179,0.5); }
-.play-game-btn:hover { transform: scale(1.05); background: #fff; box-shadow: 0 0 30px rgba(255,255,255,0.8); }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DharmaYatra — Cinematic Trailer</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            max-width: 1080px; /* Preserve 9:16 feel if needed, or fill square */
+            aspect-ratio: 9/16;
+        }
+        #start-overlay {
+            position: absolute;
+            inset: 0;
+            background: #000;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fdf5e6;
+            font-family: 'serif';
+            cursor: pointer;
+            transition: opacity 0.8s;
+        }
+        h1 { font-size: 3rem; margin-bottom: 1rem; text-align: center; }
+        p { font-size: 1.2rem; opacity: 0.7; }
+        .skip-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 200;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            display: none;
+        }
+    </style>
 </head>
 <body>
 
-<!-- START OVERLAY -->
-<div id="start-overlay" style="position:absolute; top:0; left:0; width:100%; height:100%; background:#000; z-index:10000; display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; font-family:'Georgia', serif; cursor:pointer; transition: opacity 1s;">
-  <h1 style="font-size: 60px; margin-bottom: 20px; color:#fdf5e6; letter-spacing: 2px;">DharmaYatra 101</h1>
-  <p style="font-size: 24px; font-weight: 300; letter-spacing: 3px; color:#f5deb3; animation: pulse 2s infinite;">Click anywhere to begin experience</p>
+<div id="start-overlay" onclick="startVideo()">
+    <h1>DharmaYatra 101</h1>
+    <p>Click to Play Cinematic Trailer</p>
 </div>
 
-<div class="controls">
-  <button class="skip-btn" id="skipBtn">SKIP ⏭</button>
-</div>
+<button class="skip-btn" id="skip" onclick="window.location.href='index.html'">EXIT ⏭</button>
 
-<div class="stage" id="stage">
-  <!-- 1 -->
-  <div class="scene">
-    <img src="intro/card_1.png" />
-    <div class="text-box">
-      <h2>What if this was never just a game?</h2>
-    </div>
-  </div>
-  <!-- 2 -->
-  <div class="scene">
-    <img src="intro/card_2.png" />
-    <div class="text-box">
-      <h2>Centuries ago in India...</h2>
-      <h2>A game called Moksha Patam was created.</h2>
-    </div>
-  </div>
-  <!-- 3 -->
-  <div class="scene">
-    <img src="intro/card_3.png" />
-    <div class="text-box">
-      <h2>Ladders were virtues.</h2>
-    </div>
-  </div>
-  <!-- 4 -->
-  <div class="scene">
-    <img src="intro/card_4.png" />
-    <div class="text-box">
-      <h2>Snakes were vices.</h2>
-      <h2>Every fall carried consequence.</h2>
-    </div>
-  </div>
-  <!-- 5 -->
-  <div class="scene">
-    <img src="intro/card_5.png" />
-    <div class="text-box">
-      <h2>It was a map of life, karma, and Moksha.</h2>
-      <h2>Over time, it became a game of chance.</h2>
-    </div>
-  </div>
-  <!-- 6 -->
-  <div class="scene">
-    <img src="intro/card_6.png" />
-    <div class="text-box">
-      <h1>DharmaYatra 101</h1>
-      <h2>Brings the meaning back.</h2>
-    </div>
-  </div>
-  <!-- 7 -->
-  <div class="scene">
-    <img src="intro/card_7.png" />
-    <div class="text-box">
-      <h1>Play. Reflect. Repeat.</h1>
-      <h2 style="font-size:40px; margin-top:30px;">DharmaYatra 101 — Rooted in heritage.</h2>
-      <a href="index.html" class="play-game-btn" id="playGameBtn">Enter the Game</a>
-    </div>
-  </div>
-</div>
+<video id="trailer" playsinline>
+    <source src="../assets/India’s First Reflective Game.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+</video>
 
 <script>
-  window.onload = function() {
-    const vW = window.innerWidth;
-    const vH = window.innerHeight;
-    const scale = Math.min(vW/1080, vH/1920);
-    document.getElementById('stage').style.transform = `translate(-50%, -50%) scale(${scale})`;
-  }
-  
-  // Also handle resize just in case
-  window.onresize = function() {
-    const vW = window.innerWidth;
-    const vH = window.innerHeight;
-    const scale = Math.min(vW/1080, vH/1920);
-    document.getElementById('stage').style.transform = `translate(-50%, -50%) scale(${scale})`;
-  }
-</script>
+    const video = document.getElementById('trailer');
+    const overlay = document.getElementById('start-overlay');
+    const skipBtn = document.getElementById('skip');
 
-<audio id="bgMusic" loop>
-  <source src="music.mp3" type="audio/mpeg">
-</audio>
+    function startVideo() {
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            skipBtn.style.display = 'block';
+        }, 800);
+        video.play();
+    }
 
-<script>
-  let introTimeout;
-  const overlay = document.getElementById('start-overlay');
-  const skipBtn = document.getElementById('skipBtn');
-  const music = document.getElementById('bgMusic');
-
-  function startExperience() {
-    // Hide overlay
-    overlay.style.opacity = '0';
-    setTimeout(() => overlay.style.display = 'none', 1000);
-    
-    // Start CSS animations
-    document.body.classList.add('playing');
-    
-    // Start music with crossfade
-    music.volume = 0;
-    music.play().then(() => {
-      let vol = 0;
-      const fade = setInterval(() => {
-        if (vol < 0.4) {
-          vol += 0.02;
-          music.volume = vol;
-        } else {
-          clearInterval(fade);
-        }
-      }, 200);
-    }).catch(err => console.log("Audio play failed:", err));
-
-    // Schedule End Video
-    introTimeout = setTimeout(endVideo, 42000); // 42s total duration
-  }
-
-  function endVideo() {
-    // Fade out and pause music
-    let vol = music.volume;
-    const fade = setInterval(() => {
-      if (vol > 0.02) {
-        vol -= 0.02;
-        music.volume = Math.max(0, vol);
-      } else {
-        music.pause();
-        clearInterval(fade);
-      }
-    }, 150);
-    
-    // Jump straight to the last slide visually
-    document.body.classList.remove('playing'); 
-    
-    const scenes = document.querySelectorAll('.scene');
-    scenes.forEach(s => {
-      s.style.display = 'none'; // hide everything
-    });
-    
-    const lastScene = scenes[6];
-    lastScene.style.display = 'block';
-    lastScene.style.opacity = 1;
-    lastScene.style.animation = 'none';
-    
-    const lastImg = lastScene.querySelector('img');
-    lastImg.style.animation = 'none';
-    lastImg.style.transform = 'scale(1)';
-    
-    const lastText = lastScene.querySelector('.text-box');
-    lastText.style.animation = 'none';
-    lastText.style.opacity = 1;
-    lastText.style.transform = 'translateY(0)';
-    lastText.style.top = '40%';
-    lastText.style.zIndex = '999';
-    
-    // Hide skip controls
-    document.querySelector('.controls').style.display = 'none';
-  }
-
-  overlay.addEventListener('click', startExperience, { once: true });
-  skipBtn.addEventListener('click', () => {
-    clearTimeout(introTimeout);
-    endVideo();
-  });
+    video.onended = function() {
+        window.location.href = 'index.html';
+    };
 </script>
 
 </body>
