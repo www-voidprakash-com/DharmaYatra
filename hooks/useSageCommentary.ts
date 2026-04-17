@@ -191,13 +191,25 @@ export const useSageCommentary = ({ language, translate, sageVoice, playAudio, s
             ? `\n            Current World Energy (moment-feel): ${momentFeel.replace(/_/g, ' ')} — adjust your tone to match.`
             : '';
 
+        // Get full language name for better AI comprehension
+        const languageName = language === 'en' ? 'English' :
+            language === 'hi' ? 'Hindi' :
+            language === 'sa' ? 'Sanskrit' :
+            language === 'bn' ? 'Bengali' :
+            language === 'ta' ? 'Tamil' :
+            language === 'te' ? 'Telugu' :
+            language === 'kn' ? 'Kannada' :
+            language === 'gu' ? 'Gujarati' :
+            language === 'mr' ? 'Marathi' :
+            language === 'pa' ? 'Punjabi' : language;
+
         const prompt = `
             You are a ${persona.role} narrating 'DharmaYatra' (Snakes & Ladders).
             Event Details: Player "${player.name}" has landed on Square ${squareId} (${squareName}). 
             Player Identity: Color is ${playerColor} (their aura/guiding energy) and their spirit vehicle (wahana) is the ${playerAnimal} (representing their innate temperament).
             Spiritual Lesson of Square: "${slDescription}".
             Game Event: ${eventType.toUpperCase()}${extraTurnNote}.${momentFeelNote}${panchVediContext}
-            Language: ${language}.
+            Language: ${languageName}.
             
             Instruction: Write a profound 2-sentence commentary about this event. You MUST weave the ${playerColor} aura and the ${playerAnimal}'s nature as metaphors. The game just announced this to the player: "${turnMessage}". Use the spirit of that announcement to inform your commentary. If it's a Virtue (Ladder), how did their ${playerAnimal} spirit help them ascend? If it's a Vice (Snake), what did their ${playerColor} energy cloud — and what must they learn? Be poetic, original, and never repeat the reference line. Max 45 words.
         `;
@@ -278,12 +290,24 @@ export const useSageCommentary = ({ language, translate, sageVoice, playAudio, s
         });
 
         const persona = getVoicePersona(sageVoice);
+        
+        // Get full language name for better AI comprehension
+        const languageName = language === 'en' ? 'English' :
+            language === 'hi' ? 'Hindi' :
+            language === 'sa' ? 'Sanskrit' :
+            language === 'bn' ? 'Bengali' :
+            language === 'ta' ? 'Tamil' :
+            language === 'te' ? 'Telugu' :
+            language === 'kn' ? 'Kannada' :
+            language === 'gu' ? 'Gujarati' :
+            language === 'mr' ? 'Marathi' :
+            language === 'pa' ? 'Punjabi' : language;
 
         const prompt = `
             You are a ${persona.role} summarizing a finished game of DharmaYatra.
             Winner: "${winner.name}" (${winnerColor} ${winnerAnimal}) - Climbed ${winnerLadders} Virtues, Fell to ${winnerSnakes} Vices.
             Others: ${JSON.stringify(loserStories)}.
-            Language: ${language}.
+            Language: ${languageName}.
             Task: Create a motivating ethical story (approx 4 sentences).
         `;
 
