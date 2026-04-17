@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Player } from '../types';
 import { useLanguage } from '../App';
 import AnimalIcon from './AnimalIcon';
@@ -16,17 +16,23 @@ const WinScreen: React.FC<WinScreenProps> = ({ winners, allPlayers, onPlayAgain,
   const { translate } = useLanguage();
   const [activeTab, setActiveTab] = useState<'game' | 'global'>('game');
 
-  // "AI Generated" Image Simulation: Using /public images for simple loading
-  const victoryImage = useMemo(() => {
-    if (winners.length === 0) return '/victory_1.png';
-    const images = ['/victory_1.png', '/victory_2.png', '/victory_3.png'];
-    const hash = winners[0].name.length % images.length;
-    return images[hash];
-  }, [winners]);
+  const [imageIndex, setImageIndex] = useState(0);
+  const images = useMemo(() => ['/victory_1.png', '/victory_2.png', '/victory_3.png'], []);
 
-  if (!winners || winners.length === 0) return null;
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setImageIndex((prev) => (prev + 1) % images.length);
+    }, 4000); // Cycle every 4 seconds
+    return () => clearInterval(interval);
+  }, [images.length]);
 
-  const sortedWinners = [...winners].sort((a, b) => (a.finishRank || Infinity) - (b.finishRank || Infinity));
+  const victoryImage = images[imageIndex];
+
+  // Fallback if winners is empty (to avoid blank screen)
+  const sortedWinners = winners && winners.length > 0 
+    ? [...winners].sort((a, b) => (a.finishRank || Infinity) - (b.finishRank || Infinity))
+    : [];
+  
   const mainWinner = sortedWinners[0];
 
   let title = '';
@@ -62,18 +68,20 @@ const WinScreen: React.FC<WinScreenProps> = ({ winners, allPlayers, onPlayAgain,
             <img src={victoryImage} alt="Victory Scene" className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-1000" />
 
             {/* Overlay Winner Peg */}
-            <div className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 flex flex-col items-center animate-bounce-subtle`}>
-              <div className={`w-20 h-20 rounded-full ${mainWinner.color.tailwindClass} flex items-center justify-center border-4 border-white shadow-[0_0_20px_rgba(255,255,255,0.8)] overflow-hidden`}>
-                {mainWinner.profilePic ? (
-                  <img src={mainWinner.profilePic} alt={mainWinner.name} className="w-full h-full object-cover" />
-                ) : (
-                  <AnimalIcon iconKey={mainWinner.animalIcon.iconKey} className="w-12 h-12 text-white drop-shadow-md" />
-                )}
+            {mainWinner && (
+              <div className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 flex flex-col items-center animate-bounce-subtle`}>
+                <div className={`w-20 h-20 rounded-full ${mainWinner.color.tailwindClass} flex items-center justify-center border-4 border-white shadow-[0_0_20px_rgba(255,255,255,0.8)] overflow-hidden`}>
+                  {mainWinner.profilePic ? (
+                    <img src={mainWinner.profilePic} alt={mainWinner.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <AnimalIcon iconKey={mainWinner.animalIcon.iconKey} className="w-12 h-12 text-white drop-shadow-md" />
+                  )}
+                </div>
+                <div className="mt-2 bg-black/60 backdrop-blur-md text-white px-4 py-1 rounded-full text-sm font-bold border border-white/20">
+                  {mainWinner.name}
+                </div>
               </div>
-              <div className="mt-2 bg-black/60 backdrop-blur-md text-white px-4 py-1 rounded-full text-sm font-bold border border-white/20">
-                {mainWinner.name}
-              </div>
-            </div>
+            )}
 
             <div className="absolute top-2 right-2 bg-black/40 backdrop-blur text-[10px] text-white px-2 py-0.5 rounded">
               🤖 AI Generated Scene

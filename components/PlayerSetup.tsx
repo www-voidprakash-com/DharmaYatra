@@ -410,10 +410,10 @@ const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, userNickname, us
                   try {
                     const { GoogleGenAI } = await import('@google/genai');
                     const ai = new GoogleGenAI({ apiKey: userApiKey });
-                    await (ai.models as any).generateContent({ model: "gemini-1.5-flash", contents: "test", config: { maxOutputTokens: 1 }});
+                    await (ai.models as any).generateContent({ model: "gemini-1.5-flash-latest", contents: "test", config: { maxOutputTokens: 1 }});
                     alert("API Key Validated Successfully! You are ready for the best AI experience.");
                   } catch (e: any) {
-                    alert("Invalid or Unauthorized API Key!\n\n" + e.message);
+                    alert("API Validation Failed!\n\nPlease check your key and model access.\n\nError: " + e.message);
                   }
                 }}
               >

@@ -223,7 +223,7 @@ export const useSageCommentary = ({ language, translate, sageVoice, playAudio, s
                 const { GoogleGenAI } = await import("@google/genai");
                 const ai = new GoogleGenAI({ apiKey });
                 const result = await (ai.models as any).generateContent({
-                    model: 'gemini-1.5-flash',
+                    model: 'gemini-1.5-flash-latest',
                     contents: prompt,
                     config: {
                         temperature: 0.7,
@@ -308,7 +308,7 @@ export const useSageCommentary = ({ language, translate, sageVoice, playAudio, s
                 const { GoogleGenAI } = await import("@google/genai");
                 const ai = new GoogleGenAI({ apiKey });
                 const result = await (ai.models as any).generateContent({
-                    model: 'gemini-1.5-flash',
+                    model: 'gemini-1.5-flash-latest',
                     contents: prompt,
                     config: { temperature: 0.7, maxOutputTokens: 256 }
                 });

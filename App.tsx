@@ -13,6 +13,7 @@ import PlayerSetup from './components/PlayerSetup';
 import CinematicIntro from './components/CinematicIntro';
 import VideoIntro from './components/VideoIntro';
 import WinScreen from './components/WinScreen';
+import WinPopup from './components/WinPopup';
 import HistoryLog from './components/HistoryLog';
 import NicknameInput from './components/NicknameInput';
 import GameStateSync from './components/GameStateSync';
@@ -100,6 +101,7 @@ const App = (): React.ReactElement => {
   const [messageReplacements, setMessageReplacements] = useState<Record<string, string | number | undefined> | undefined>(undefined);
   const [gameStage, setGameStage] = useState<GameStage>(GameStage.Setup);
   const [winners, setWinners] = useState<Player[]>([]);
+  const [showWinPopup, setShowWinPopup] = useState<boolean>(false);
   const [messageHistory, setMessageHistory] = useState<MessageHistoryEntry[]>([]);
   const [turnHistory, setTurnHistory] = useState<TurnHistoryEntry[]>([]);
   const [animationState, setAnimationState] = useState<AnimationState | null>(null);
@@ -719,6 +721,9 @@ const App = (): React.ReactElement => {
         // Win always overrides other commentary
         aiEventType = 'win';
         aiEventDetail = 'Poorna';
+        if (winners.length === 0) {
+          setShowWinPopup(true);
+        }
       }
       playerToUpdate.hasFinished = true;
       hasPlayerFinished = true;
@@ -1086,13 +1091,17 @@ const App = (): React.ReactElement => {
       {userNickname && gameMode === 'multiplayer' && (
         <GameStateSync roomId={roomId} onUpdate={handleRemoteGameStateUpdate} />
       )}
-      {gameStage === GameStage.GameOver && winners.length > 0 && (
+      {gameStage === GameStage.GameOver && (
         <WinScreen
           winners={winners}
           allPlayers={players}
           onPlayAgain={resetGame}
           summaryText={sageWisdom}
         />
+      )}
+
+      {showWinPopup && (
+        <WinPopup onComplete={() => setShowWinPopup(false)} />
       )}
       <div
         className={`game-wrapper min-h-screen bg-repeat bg-auto text-stone-700`}

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Howl } from 'howler';
 import './CinematicIntro.css';
 
 interface CinematicIntroProps {
@@ -7,6 +8,25 @@ interface CinematicIntroProps {
 
 const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) => {
   const [hasStarted, setHasStarted] = useState(false);
+
+  // Background Music
+  useEffect(() => {
+    if (!hasStarted) return;
+
+    const introMusic = new Howl({
+      src: ['/music.mp3'],
+      autoplay: true,
+      loop: false,
+      volume: 0,
+    });
+
+    introMusic.fade(0, 0.7, 3000);
+
+    return () => {
+      introMusic.fade(introMusic.volume(), 0, 2000);
+      setTimeout(() => introMusic.stop(), 2000);
+    };
+  }, [hasStarted]);
 
   useEffect(() => {
     if (!hasStarted) return;
@@ -30,62 +50,6 @@ const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) => {
     window.addEventListener('resize', handleResize);
     handleResize();
     return () => window.removeEventListener('resize', handleResize);
-  }, [hasStarted]);
-
-  // Ambient Spiritual Tanpura Drone Generation via Web Audio API
-  useEffect(() => {
-    if (!hasStarted) return;
-
-    let audioCtx: AudioContext;
-    let masterGain: GainNode;
-    let osc1: OscillatorNode, osc2: OscillatorNode, osc3: OscillatorNode;
-
-    try {
-      audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      masterGain = audioCtx.createGain();
-      masterGain.connect(audioCtx.destination);
-      masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
-      masterGain.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + 5); // Deep 5-second fade in
-
-      const baseFreq = 136.1; // Frequency of 'Om' (C# 136.1 Hz)
-
-      osc1 = audioCtx.createOscillator();
-      osc1.frequency.value = baseFreq;
-      osc1.type = 'sine';
-
-      osc2 = audioCtx.createOscillator();
-      osc2.frequency.value = baseFreq * 1.5; // Perfect fifth for tanpura harmony
-      osc2.type = 'triangle';
-
-      osc3 = audioCtx.createOscillator();
-      osc3.frequency.value = baseFreq / 2; // Sub-octave for deep resonance
-      osc3.type = 'sine';
-
-      const filter = audioCtx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = 350; // Muffled, atmospheric, ethereal
-
-      osc1.connect(filter);
-      osc2.connect(filter);
-      osc3.connect(filter);
-      filter.connect(masterGain);
-
-      osc1.start();
-      osc2.start();
-      osc3.start();
-
-      return () => {
-        masterGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 3); // fade out gracefully
-        setTimeout(() => {
-          try {
-            osc1.stop(); osc2.stop(); osc3.stop();
-            audioCtx.close();
-          } catch(e) {}
-        }, 3000);
-      };
-    } catch (e) {
-      console.warn("Audio Context failed to start.", e);
-    }
   }, [hasStarted]);
 
   if (!hasStarted) {
